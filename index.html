@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Burst">
+<meta name="theme-color" content="#010207">
+<link rel="manifest" href="manifest.json">
+<title>Burst</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+
+/* ── Thèmes ── */
+:root {
+  --bg1:#020e21;--bg2:#010c1a;
+  --accent:#4dd9c0;--accent2:#a8f0e4;
+  --bubble1:rgba(255,255,255,0.42);
+  --bubble2:rgba(77,217,192,0.14);
+  --text:white;--text-sub:rgba(255,255,255,0.44);
+  --text-dim:rgba(255,255,255,0.18);
+  --box:rgba(255,255,255,0.07);
+  --particle:77,217,192;
+}
+[data-theme="foret"]{--bg1:#0a1a0e;--bg2:#061209;--accent:#4dba6a;--accent2:#a8f0b8;--particle:77,186,106}
+[data-theme="soleil"]{--bg1:#1a0e02;--bg2:#120a01;--accent:#f09040;--accent2:#f8c89a;--particle:240,144,64}
+[data-theme="espace"]{--bg1:#080010;--bg2:#040008;--accent:#9b59f0;--accent2:#d4a8f8;--particle:155,89,240}
+[data-theme="printemps"]{--bg1:#1a0812;--bg2:#12050d;--accent:#f059a0;--accent2:#f8a8cc;--particle:240,89,160}
+[data-theme="ete"]{--bg1:#0a1205;--bg2:#060c03;--accent:#a0d040;--accent2:#ccf088;--particle:160,208,64}
+[data-theme="automne"]{--bg1:#1a0a02;--bg2:#120601;--accent:#d06820;--accent2:#f0a870;--particle:208,104,32}
+[data-theme="hiver"]{--bg1:#050a1a;--bg2:#030712;--accent:#80c8f0;--accent2:#c0e8fc;--particle:128,200,240}
+
+html,body{width:100%;height:100%;height:100dvh;overflow:hidden;
+  background:var(--bg1);font-family:-apple-system,'SF Pro Display','Helvetica Neue',sans-serif;
+  color:var(--text);-webkit-font-smoothing:antialiased;transition:background 0.8s ease}
+
+#app{position:fixed;inset:0;overflow:hidden;background:var(--bg1);transition:background 0.8s}
+
+/* ── Canvas ── */
+#waveCanvas{position:fixed;inset:0;pointer-events:none;z-index:1;opacity:0;transition:opacity 0.4s}
+#waveCanvas.active{opacity:1}
+#particleCanvas{position:fixed;inset:0;pointer-events:none;z-index:8}
+
+/* ── Dynamic Island (iPhone uniquement) ── */
+#diRing{
+  display:none;
+  position:fixed;top:11px;left:50%;
+  transform:translateX(-50%);
+  width:126px;height:37px;
+  border-radius:20px;
+  z-index:10;pointer-events:none;
+  animation:diPulse 2.5s ease-in-out infinite;
+}
+@keyframes diPulse{
+  0%,100%{box-shadow:0 0 0 1.5px var(--accent),0 0 8px rgba(var(--particle),0.4)}
+  50%{box-shadow:0 0 0 2px var(--accent),0 0 16px rgba(var(--particle),0.7)}
+}
+
+/* ── Header ── */
+#header{
+  position:fixed;top:0;left:0;right:0;
+  padding-top:max(env(safe-area-inset-top,44px),44px);
+  padding-top:calc(max(env(safe-area-inset-top,44px),44px) + 10px);
+  padding-left:24px;padding-right:24px;
+  display:flex;align-items:center;justify-content:space-between;
+  z-index:20;pointer-events:auto;
+}
+.logo{font-size:12px;font-weight:300;letter-spacing:0.45em;color:var(--text)}
+.header-right{display:flex;align-items:center;gap:12px}
+.icon-btn{background:none;border:none;color:var(--text-sub);font-size:16px;cursor:pointer;padding:8px;opacity:0.75;line-height:1}
+
+/* ── Tagline ── */
+#tagline{position:fixed;top:90px;left:24px;right:24px;
+  font-size:10px;font-weight:200;letter-spacing:0.2em;
+  color:var(--text-sub);z-index:5;pointer-events:none;
+  transition:opacity 0.5s}
+
+/* ── Citation ── */
+#citation{position:fixed;bottom:140px;left:32px;right:32px;
+  font-size:11px;font-weight:200;font-style:italic;
+  letter-spacing:0.1em;color:var(--text-dim);
+  text-align:center;z-index:5;pointer-events:none;
+  line-height:1.6;transition:opacity 1s}
+
+/* ── Counter ── */
+#counter{position:fixed;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  text-align:center;z-index:3;pointer-events:none;
+  opacity:0;transition:opacity 0.5s}
+#counter.visible{opacity:1}
+#countNum{display:block;font-size:clamp(50px,16vw,74px);
+  font-weight:100;color:var(--text-dim);line-height:1}
+.count-lbl{font-size:10px;font-weight:200;letter-spacing:0.35em;color:var(--text-dim)}
+
+/* ── Game areas ── */
+.game-area{position:fixed;inset:0;pointer-events:none;z-index:2}
+.game-area.active{pointer-events:auto}
+#gravBox{position:absolute;border:1px solid var(--box);border-radius:24px;pointer-events:none}
+
+/* ── Bulle ── */
+.bubble{
+  position:absolute;border-radius:50%;cursor:pointer;
+  pointer-events:auto;will-change:transform;
+  background:radial-gradient(circle at 34% 28%,
+    var(--bubble1) 0%,rgba(255,255,255,0.05) 35%,
+    rgba(var(--particle),0.08) 65%,var(--bubble2) 100%);
+  border:1px solid rgba(255,255,255,0.28);
+  box-shadow:inset 0 2px 10px rgba(255,255,255,0.16),
+    inset 0 -1px 5px rgba(var(--particle),0.08),
+    0 8px 28px rgba(0,0,0,0.32);
+  overflow:hidden;
+  transition:box-shadow 0.3s;
+}
+.bubble::before{content:'';position:absolute;
+  top:13%;left:16%;width:31%;height:19%;
+  background:rgba(255,255,255,0.58);border-radius:50%;
+  filter:blur(3px);transform:rotate(-15deg)}
+.bubble::after{content:'';position:absolute;
+  bottom:20%;right:17%;width:11%;height:7%;
+  background:rgba(var(--particle),0.6);border-radius:50%;filter:blur(1.5px)}
+.bubble.popping{transform:scale(1.35)!important;opacity:0!important;
+  transition:transform 0.13s ease,opacity 0.13s ease!important}
+
+/* ── Ripple ── */
+.ripple{position:absolute;border-radius:50%;
+  border:1.5px solid rgba(var(--particle),0.55);
+  pointer-events:none;
+  transform:translate(-50%,-50%) scale(0);
+  animation:rippleOut 0.75s ease-out forwards}
+@keyframes rippleOut{
+  0%{transform:translate(-50%,-50%) scale(0);opacity:1}
+  100%{transform:translate(-50%,-50%) scale(3.5);opacity:0}}
+
+/* ── Boutons bas ── */
+#bottomBar{
+  position:fixed;
+  bottom:calc(env(safe-area-inset-bottom,20px) + 14px);
+  left:0;right:0;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 20px;z-index:20;pointer-events:none;
+}
+#themeBtn{
+  pointer-events:auto;
+  width:42px;height:42px;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;cursor:pointer;
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+}
+#switchBtn{
+  pointer-events:auto;
+  display:flex;align-items:center;gap:6px;
+  padding:11px 20px;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:100px;
+  color:var(--text-sub);font-size:11px;font-weight:300;
+  letter-spacing:0.1em;cursor:pointer;
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+}
+#statsBtn{
+  pointer-events:auto;
+  width:42px;height:42px;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;cursor:pointer;
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+}
+
+/* ── Message session ── */
+#sessionMsg{
+  position:fixed;
+  bottom:calc(env(safe-area-inset-bottom,20px) + 72px);
+  left:50%;transform:translateX(-50%);
+  font-size:11px;font-weight:200;color:var(--text-sub);
+  letter-spacing:0.18em;text-align:center;
+  z-index:20;pointer-events:none;
+  opacity:0;transition:opacity 0.5s;white-space:nowrap}
+#sessionMsg.visible{opacity:1}
+
+/* ── Panels (settings, themes, stats, profile) ── */
+.panel{
+  position:fixed;inset:0;
+  background:var(--bg1);z-index:50;
+  display:flex;flex-direction:column;
+  padding:calc(max(env(safe-area-inset-top,44px),44px) + 16px) 24px
+          calc(env(safe-area-inset-bottom,20px) + 20px);
+  transform:translateY(100%);
+  transition:transform 0.4s cubic-bezier(0.34,1.2,0.64,1);
+  overflow-y:auto;
+}
+.panel.open{transform:translateY(0)}
+
+.panel-header{display:flex;align-items:center;
+  justify-content:space-between;margin-bottom:32px}
+.panel-title{font-size:11px;font-weight:300;
+  letter-spacing:0.5em;color:var(--text)}
+.close-btn{background:none;border:none;color:var(--text-sub);
+  font-size:20px;cursor:pointer;padding:8px}
+.section-lbl{font-size:9px;font-weight:300;letter-spacing:0.4em;
+  text-transform:uppercase;color:var(--text-sub);margin-bottom:16px}
+.divider{height:1px;background:rgba(255,255,255,0.08);margin:24px 0}
+.stat-row{display:flex;justify-content:space-between;
+  align-items:center;margin-bottom:14px}
+.stat-label{font-size:11px;font-weight:200;color:var(--text-sub)}
+.stat-val{font-size:11px;font-weight:300;color:var(--text)}
+
+/* ── Toggle switch ── */
+.toggle-row{display:flex;justify-content:space-between;
+  align-items:center;margin-bottom:20px}
+.toggle-label{font-size:11px;font-weight:200;color:var(--text-sub)}
+.toggle{position:relative;width:44px;height:26px}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;inset:0;
+  background:rgba(255,255,255,0.15);border-radius:13px;
+  cursor:pointer;transition:0.3s}
+.toggle-slider::before{content:'';position:absolute;
+  width:20px;height:20px;left:3px;top:3px;
+  background:white;border-radius:50%;transition:0.3s}
+.toggle input:checked+.toggle-slider{background:var(--accent)}
+.toggle input:checked+.toggle-slider::before{transform:translateX(18px)}
+
+/* ── Sélecteur de langue ── */
+.lang-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:20px}
+.lang-btn{padding:10px 4px;background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.1);border-radius:12px;
+  color:var(--text-sub);font-size:10px;text-align:center;
+  cursor:pointer;transition:all 0.2s}
+.lang-btn.active{background:rgba(var(--particle),0.15);
+  border-color:var(--accent);color:var(--text)}
+
+/* ── Grille de thèmes ── */
+.theme-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.theme-card{padding:20px 16px;border-radius:16px;
+  border:1px solid rgba(255,255,255,0.1);
+  cursor:pointer;transition:all 0.25s;text-align:center}
+.theme-card.active{border-color:var(--accent);
+  box-shadow:0 0 20px rgba(var(--particle),0.2)}
+.theme-icon{font-size:28px;display:block;margin-bottom:8px}
+.theme-name{font-size:11px;font-weight:300;
+  color:var(--text-sub);letter-spacing:0.1em}
+
+/* ── Profil / Onboarding ── */
+#profilePanel{
+  position:fixed;inset:0;
+  background:var(--bg1);z-index:60;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:40px 32px;
+  gap:24px;
+}
+.profile-title{font-size:28px;font-weight:200;
+  letter-spacing:0.3em;color:var(--accent);text-align:center}
+.profile-sub{font-size:12px;font-weight:200;
+  color:var(--text-sub);letter-spacing:0.15em;text-align:center}
+.profile-input{width:100%;max-width:280px;
+  padding:14px 20px;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.15);
+  border-radius:100px;color:var(--text);
+  font-size:14px;font-weight:200;
+  letter-spacing:0.1em;text-align:center;outline:none}
+.profile-input::placeholder{color:rgba(255,255,255,0.25)}
+.profile-btn{padding:14px 40px;
+  background:rgba(var(--particle),0.15);
+  border:1px solid var(--accent);
+  border-radius:100px;color:var(--accent2);
+  font-size:12px;font-weight:300;
+  letter-spacing:0.2em;cursor:pointer}
+
+/* ── Code panel ── */
+#codeBox{
+  background:rgba(var(--particle),0.08);
+  border:1px solid rgba(var(--particle),0.3);
+  border-radius:16px;padding:24px;
+  text-align:center;margin:16px 0}
+#codeDisplay{font-size:28px;font-weight:200;
+  letter-spacing:0.4em;color:var(--accent)}
+.code-actions{display:flex;gap:12px;justify-content:center;
+  margin-top:16px;flex-wrap:wrap}
+.code-btn{padding:10px 20px;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:100px;color:var(--text-sub);
+  font-size:10px;font-weight:300;
+  letter-spacing:0.15em;cursor:pointer}
+
+/* ── Permission overlay ── */
+#permOverlay{
+  position:fixed;inset:0;z-index:40;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:16px;
+  background:rgba(1,2,7,0.9);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  opacity:0;pointer-events:none;transition:opacity 0.3s}
+#permOverlay.visible{opacity:1;pointer-events:auto}
+#permOverlay p{font-size:14px;font-weight:200;
+  color:var(--text-sub);letter-spacing:0.1em;
+  text-align:center;max-width:260px;line-height:1.7}
+.perm-btn{padding:13px 30px;
+  background:rgba(var(--particle),0.14);
+  border:1px solid var(--accent);border-radius:100px;
+  color:var(--accent2);font-size:12px;font-weight:300;
+  letter-spacing:0.15em;cursor:pointer}
+
+/* ── Action feedback ── */
+.toast{
+  position:fixed;top:100px;left:50%;
+  transform:translateX(-50%);
+  background:rgba(var(--particle),0.15);
+  border:1px solid var(--accent);
+  border-radius:100px;padding:10px 20px;
+  font-size:11px;color:var(--accent2);
+  letter-spacing:0.1em;z-index:100;
+  opacity:0;transition:opacity 0.3s;pointer-events:none;
+  white-space:nowrap}
+.toast.show{opacity:1}
+
+/* ── Responsive PC ── */
+@media(min-width:768px){
+  .bubble{cursor:default}
+  #switchBtn{cursor:pointer}
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <canvas id="waveCanvas"></canvas>
+  <canvas id="particleCanvas"></canvas>
+
+  <!-- Dynamic Island (iPhone seulement, géré via JS) -->
+  <div id="diRing"></div>
+
+  <!-- Header -->
+  <div id="header">
+    <span class="logo">BURST</span>
+    <div class="header-right">
+      <button class="icon-btn" id="profileBtn" title="Profil">👤</button>
+      <button class="icon-btn" id="settingsBtn" title="Paramètres">⚙</button>
+    </div>
+  </div>
+
+  <!-- Tagline -->
+  <div id="tagline"></div>
+
+  <!-- Counter -->
+  <div id="counter">
+    <span id="countNum">0</span>
+    <span class="count-lbl" id="countLbl">éclatées</span>
+  </div>
+
+  <!-- Citation -->
+  <div id="citation"></div>
+
+  <!-- Bulles -->
+  <div id="bubblesArea" class="game-area active"></div>
+
+  <!-- Gravité -->
+  <div id="gravityArea" class="game-area">
+    <div id="gravBox"></div>
+  </div>
+
+  <!-- Barre du bas -->
+  <div id="bottomBar">
+    <button id="themeBtn" title="Thème">🎨</button>
+    <button id="switchBtn">🌊 <span id="switchLabel">Gravité</span></button>
+    <button id="statsBtn" title="Stats">📊</button>
+  </div>
+
+  <!-- Message session -->
+  <div id="sessionMsg"></div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <!-- Panel Paramètres -->
+  <div class="panel" id="settingsPanel">
+    <div class="panel-header">
+      <span class="panel-title" id="settingsTitle">PARAMÈTRES</span>
+      <button class="close-btn" onclick="closePanel('settingsPanel')">✕</button>
+    </div>
+    <div class="section-lbl" id="lblLangue">Langue</div>
+    <div class="lang-grid">
+      <button class="lang-btn" data-lang="fr" onclick="setLangue('fr')">🇫🇷<br>FR</button>
+      <button class="lang-btn" data-lang="en" onclick="setLangue('en')">🇬🇧<br>EN</button>
+      <button class="lang-btn" data-lang="es" onclick="setLangue('es')">🇪🇸<br>ES</button>
+      <button class="lang-btn" data-lang="ja" onclick="setLangue('ja')">🇯🇵<br>JA</button>
+      <button class="lang-btn" data-lang="pt" onclick="setLangue('pt')">🇧🇷<br>PT</button>
+    </div>
+    <div class="divider"></div>
+    <div class="section-lbl" id="lblAudio">Audio</div>
+    <div class="toggle-row">
+      <span class="toggle-label" id="lblSon">Son</span>
+      <label class="toggle">
+        <input type="checkbox" id="toggleSon" checked onchange="toggleAudio()">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label" id="lblVibration">Vibrations</span>
+      <label class="toggle">
+        <input type="checkbox" id="toggleVib" checked onchange="toggleVibration()">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="divider"></div>
+    <div class="section-lbl" id="lblSonsAmbiance">Sons d'ambiance</div>
+    <div class="toggle-row">
+      <span class="toggle-label" id="lblAmbiance">Ambiance</span>
+      <label class="toggle">
+        <input type="checkbox" id="toggleAmbiance" onchange="toggleAmbianceSound()">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="settings-footer" style="margin-top:auto;text-align:center;font-size:9px;color:rgba(255,255,255,0.18);letter-spacing:0.3em;padding-top:32px">Burst · fait avec 💙</div>
+  </div>
+
+  <!-- Panel Thèmes -->
+  <div class="panel" id="themesPanel">
+    <div class="panel-header">
+      <span class="panel-title" id="themesTitle">THÈMES</span>
+      <button class="close-btn" onclick="closePanel('themesPanel')">✕</button>
+    </div>
+    <div class="theme-grid" id="themeGrid"></div>
+  </div>
+
+  <!-- Panel Stats -->
+  <div class="panel" id="statsPanel">
+    <div class="panel-header">
+      <span class="panel-title" id="statsTitle">STATISTIQUES</span>
+      <button class="close-btn" onclick="closePanel('statsPanel')">✕</button>
+    </div>
+    <div class="section-lbl" id="lblSession">Session actuelle</div>
+    <div class="stat-row"><span class="stat-label" id="lblEclatees">Bulles éclatées</span><span class="stat-val" id="sSession">0</span></div>
+    <div class="stat-row"><span class="stat-label" id="lblParMin">Par minute</span><span class="stat-val" id="sParMin">0</span></div>
+    <div class="divider"></div>
+    <div class="section-lbl" id="lblTotal">Total</div>
+    <div class="stat-row"><span class="stat-label" id="lblTotalBulles">Total bulles</span><span class="stat-val" id="sTotal">0</span></div>
+    <div class="stat-row"><span class="stat-label" id="lblRecord">Record session</span><span class="stat-val" id="sRecord">0</span></div>
+    <div class="stat-row"><span class="stat-label" id="lblModesPref">Mode préféré</span><span class="stat-val" id="sMode">—</span></div>
+    <div class="divider"></div>
+    <div class="section-lbl" id="lblPartager">Partager</div>
+    <button class="code-btn" id="shareBtn" style="width:100%;margin-bottom:12px" onclick="shareScore()">📤 <span id="lblShare">Partager mon score</span></button>
+  </div>
+
+  <!-- Panel Profil -->
+  <div class="panel" id="profilPanel">
+    <div class="panel-header">
+      <span class="panel-title" id="profilTitle">MON PROFIL</span>
+      <button class="close-btn" onclick="closePanel('profilPanel')">✕</button>
+    </div>
+    <div class="section-lbl" id="lblMonCode">Mon code de sauvegarde</div>
+    <div id="codeBox">
+      <div id="codeDisplay">—</div>
+      <div style="font-size:10px;color:var(--text-sub);margin-top:8px;letter-spacing:0.1em" id="lblCodeSub">Entre ce code sur un nouvel appareil pour retrouver ta progression</div>
+    </div>
+    <div class="code-actions">
+      <button class="code-btn" onclick="copyCode()">📋 <span id="lblCopier">Copier</span></button>
+      <button class="code-btn" onclick="shareCode()">📤 <span id="lblPartagerCode">Partager</span></button>
+      <button class="code-btn" onclick="openEmailPanel()">📧 <span id="lblEmail">Recevoir par mail</span></button>
+    </div>
+    <div class="divider"></div>
+    <div class="section-lbl" id="lblPseudo">Pseudo</div>
+    <div class="stat-row">
+      <span class="stat-label" id="lblMonPseudo">Mon pseudo</span>
+      <span class="stat-val" id="sPseudo">—</span>
+    </div>
+    <div class="divider"></div>
+    <button class="code-btn" id="resetBtn" style="color:rgba(255,100,100,0.6);border-color:rgba(255,100,100,0.2)" onclick="resetProfil()">
+      <span id="lblReset">Réinitialiser le profil</span>
+    </button>
+  </div>
+
+  <!-- Panel Email -->
+  <div class="panel" id="emailPanel">
+    <div class="panel-header">
+      <span class="panel-title" id="emailTitle">RECEVOIR MON CODE</span>
+      <button class="close-btn" onclick="closePanel('emailPanel')">✕</button>
+    </div>
+    <p style="font-size:12px;color:var(--text-sub);letter-spacing:0.1em;line-height:1.7;margin-bottom:24px" id="emailSub">Entre ton adresse email pour recevoir ton code de sauvegarde.</p>
+    <input type="email" class="profile-input" id="emailInput" placeholder="ton@email.com" style="margin-bottom:16px;border-radius:16px;text-align:left;padding:14px 20px">
+    <button class="profile-btn" onclick="envoyerEmail()" id="sendEmailBtn">📧 <span id="lblEnvoyer">Envoyer</span></button>
+  </div>
+
+  <!-- Onboarding Profil -->
+  <div id="profilePanel">
+    <div class="profile-title">BURST</div>
+    <p class="profile-sub" id="onboardSub">respire · éclate · relâche</p>
+    <p style="font-size:12px;color:var(--text-sub);letter-spacing:0.1em;text-align:center;max-width:260px;line-height:1.7" id="onboardMsg">Choisis un pseudo pour commencer</p>
+    <input type="text" class="profile-input" id="pseudoInput" maxlength="20" id="onboardInput">
+    <button class="profile-btn" onclick="creerProfil()" id="onboardBtn">Commencer 🫧</button>
+  </div>
+
+  <!-- Permission overlay -->
+  <div id="permOverlay">
+    <p id="permMsg">Autorise l'accès au mouvement pour activer la gravité</p>
+    <button class="perm-btn" onclick="requestMotion()" id="permBtn">Activer</button>
+  </div>
+
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════
+// TRADUCTIONS
+// ═══════════════════════════════════════════════
+const T = {
+  fr:{
+    tagBulles:'respire · éclate · relâche',
+    tagVite:'tu vas vite · respire',
+    tagGravite:'incline · les bulles suivent',
+    tagNuit:'mode nuit · doux 🌙',
+    switchGravite:'Gravité',switchBulles:'Bulles',
+    eclatees:'éclatées',session:'Session actuelle',
+    parMin:'Par minute',total:'Total',
+    totalBulles:'Total bulles',record:'Record session',
+    modePref:'Mode préféré',partager:'Partager',
+    shareScore:'Partager mon score',
+    monCode:'Mon code de sauvegarde',
+    codeSub:'Entre ce code sur un nouvel appareil',
+    copier:'Copier',partagerCode:'Partager',
+    recevoir:'Recevoir par mail',pseudo:'Pseudo',
+    monPseudo:'Mon pseudo',reset:'Réinitialiser le profil',
+    parametres:'PARAMÈTRES',themes:'THÈMES',
+    stats:'STATISTIQUES',profil:'MON PROFIL',
+    langue:'Langue',audio:'Audio',son:'Son',
+    vibration:'Vibrations',ambiance:'Ambiance',
+    recevoir2:'RECEVOIR MON CODE',
+    emailSub:'Entre ton adresse email pour recevoir ton code.',
+    envoyer:'Envoyer',
+    onboardMsg:'Choisis un pseudo pour commencer',
+    onboardBtn:'Commencer 🫧',
+    permMsg:'Autorise le mouvement pour la gravité',
+    permBtn:'Activer',
+    emailEnvoye:'Code envoyé ! Vérifie ta boîte mail 📧',
+    codeCopie:'Code copié ! 📋',
+    greeting:'Bonjour',intro:'Voici ton code Burst :',
+    instructions:'Garde-le précieusement !',
+    signature:"L'équipe Burst",
+    tagline2:'respire · éclate · relâche',
+    sessionMsg1:'prends soin de toi ce soir 🌙',
+    sessionMsg2:'tu te détends bien 🌊',
+  },
+  en:{
+    tagBulles:'breathe · pop · release',tagVite:'slow down · breathe',
+    tagGravite:'tilt · bubbles follow gravity',tagNuit:'night mode · gentle 🌙',
+    switchGravite:'Gravity',switchBulles:'Bubbles',
+    eclatees:'popped',session:'Current session',
+    parMin:'Per minute',total:'Total',
+    totalBulles:'Total bubbles',record:'Session record',
+    modePref:'Favorite mode',partager:'Share',
+    shareScore:'Share my score',
+    monCode:'My backup code',
+    codeSub:'Enter this code on a new device',
+    copier:'Copy',partagerCode:'Share',
+    recevoir:'Receive by email',pseudo:'Username',
+    monPseudo:'My username',reset:'Reset profile',
+    parametres:'SETTINGS',themes:'THEMES',
+    stats:'STATISTICS',profil:'MY PROFILE',
+    langue:'Language',audio:'Audio',son:'Sound',
+    vibration:'Vibrations',ambiance:'Ambiance',
+    recevoir2:'RECEIVE MY CODE',
+    emailSub:'Enter your email to receive your backup code.',
+    envoyer:'Send',
+    onboardMsg:'Choose a username to start',
+    onboardBtn:'Start 🫧',
+    permMsg:'Allow motion access to enable gravity',
+    permBtn:'Enable',
+    emailEnvoye:'Code sent! Check your inbox 📧',
+    codeCopie:'Code copied! 📋',
+    greeting:'Hi',intro:'Here is your Burst code:',
+    instructions:'Keep it safe!',
+    signature:'The Burst Team',
+    tagline2:'breathe · pop · release',
+    sessionMsg1:'take care of yourself tonight 🌙',
+    sessionMsg2:"you're relaxing well 🌊",
+  },
+  es:{
+    tagBulles:'respira · explota · suelta',tagVite:'ve despacio · respira',
+    tagGravite:'inclina · las burbujas siguen',tagNuit:'modo noche · suave 🌙',
+    switchGravite:'Gravedad',switchBulles:'Burbujas',
+    eclatees:'explotadas',session:'Sesión actual',
+    parMin:'Por minuto',total:'Total',
+    totalBulles:'Total burbujas',record:'Récord sesión',
+    modePref:'Modo favorito',partager:'Compartir',
+    shareScore:'Compartir mi puntuación',
+    monCode:'Mi código de respaldo',
+    codeSub:'Introduce este código en un nuevo dispositivo',
+    copier:'Copiar',partagerCode:'Compartir',
+    recevoir:'Recibir por email',pseudo:'Usuario',
+    monPseudo:'Mi usuario',reset:'Restablecer perfil',
+    parametres:'AJUSTES',themes:'TEMAS',
+    stats:'ESTADÍSTICAS',profil:'MI PERFIL',
+    langue:'Idioma',audio:'Audio',son:'Sonido',
+    vibration:'Vibraciones',ambiance:'Ambiente',
+    recevoir2:'RECIBIR MI CÓDIGO',
+    emailSub:'Introduce tu email para recibir tu código.',
+    envoyer:'Enviar',
+    onboardMsg:'Elige un usuario para empezar',
+    onboardBtn:'Empezar 🫧',
+    permMsg:'Permite el movimiento para activar la gravedad',
+    permBtn:'Activar',
+    emailEnvoye:'¡Código enviado! Revisa tu correo 📧',
+    codeCopie:'¡Código copiado! 📋',
+    greeting:'Hola',intro:'Aquí está tu código Burst:',
+    instructions:'¡Guárdalo bien!',
+    signature:'El equipo Burst',
+    tagline2:'respira · explota · suelta',
+    sessionMsg1:'cuídate esta noche 🌙',
+    sessionMsg2:'te estás relajando bien 🌊',
+  },
+  ja:{
+    tagBulles:'呼吸 · 弾く · 解放',tagVite:'ゆっくり · 呼吸して',
+    tagGravite:'傾けて · 泡が重力に従う',tagNuit:'ナイトモード 🌙',
+    switchGravite:'重力',switchBulles:'バブル',
+    eclatees:'個弾いた',session:'現在のセッション',
+    parMin:'毎分',total:'合計',
+    totalBulles:'合計バブル',record:'最高記録',
+    modePref:'お気に入りモード',partager:'共有',
+    shareScore:'スコアを共有',
+    monCode:'バックアップコード',
+    codeSub:'新しいデバイスでこのコードを入力',
+    copier:'コピー',partagerCode:'共有',
+    recevoir:'メールで受け取る',pseudo:'ユーザー名',
+    monPseudo:'ユーザー名',reset:'プロフィールをリセット',
+    parametres:'設定',themes:'テーマ',
+    stats:'統計',profil:'プロフィール',
+    langue:'言語',audio:'オーディオ',son:'サウンド',
+    vibration:'バイブレーション',ambiance:'環境音',
+    recevoir2:'コードを受け取る',
+    emailSub:'メールアドレスを入力してください',
+    envoyer:'送信',
+    onboardMsg:'ユーザー名を選んでください',
+    onboardBtn:'始める 🫧',
+    permMsg:'重力を有効にするためにモーションを許可',
+    permBtn:'許可する',
+    emailEnvoye:'送信しました！受信ボックスを確認 📧',
+    codeCopie:'コピーしました！ 📋',
+    greeting:'こんにちは',intro:'Burstコード：',
+    instructions:'大切に保管してください！',
+    signature:'Burstチーム',
+    tagline2:'呼吸 · 弾く · 解放',
+    sessionMsg1:'今夜もお大事に 🌙',
+    sessionMsg2:'よくリラックスできています 🌊',
+  },
+  pt:{
+    tagBulles:'respire · estoure · solte',tagVite:'devagar · respire',
+    tagGravite:'incline · as bolhas seguem',tagNuit:'modo noturno 🌙',
+    switchGravite:'Gravidade',switchBulles:'Bolhas',
+    eclatees:'estouradas',session:'Sessão atual',
+    parMin:'Por minuto',total:'Total',
+    totalBulles:'Total bolhas',record:'Recorde sessão',
+    modePref:'Modo favorito',partager:'Compartilhar',
+    shareScore:'Compartilhar pontuação',
+    monCode:'Meu código de backup',
+    codeSub:'Digite este código em um novo dispositivo',
+    copier:'Copiar',partagerCode:'Compartilhar',
+    recevoir:'Receber por email',pseudo:'Usuário',
+    monPseudo:'Meu usuário',reset:'Redefinir perfil',
+    parametres:'CONFIGURAÇÕES',themes:'TEMAS',
+    stats:'ESTATÍSTICAS',profil:'MEU PERFIL',
+    langue:'Idioma',audio:'Áudio',son:'Som',
+    vibration:'Vibrações',ambiance:'Ambiente',
+    recevoir2:'RECEBER MEU CÓDIGO',
+    emailSub:'Digite seu email para receber seu código.',
+    envoyer:'Enviar',
+    onboardMsg:'Escolha um usuário para começar',
+    onboardBtn:'Começar 🫧',
+    permMsg:'Permita o movimento para ativar a gravidade',
+    permBtn:'Ativar',
+    emailEnvoye:'Código enviado! Verifique seu email 📧',
+    codeCopie:'Código copiado! 📋',
+    greeting:'Olá',intro:'Aqui está seu código Burst:',
+    instructions:'Guarde com cuidado!',
+    signature:'A equipe Burst',
+    tagline2:'respire · estoure · solte',
+    sessionMsg1:'cuide-se esta noite 🌙',
+    sessionMsg2:'você está relaxando bem 🌊',
+  }
+};
+
+// ═══════════════════════════════════════════════
+// CITATIONS PAR THÈME
+// ═══════════════════════════════════════════════
+const CITATIONS = {
+  ocean:{fr:["L'eau trouve toujours son chemin.","Laisse-toi porter par les vagues.","La mer se calme après la tempête."],
+    en:["Water always finds its way.","Let the waves carry you.","The sea calms after the storm."],
+    es:["El agua siempre encuentra su camino.","Déjate llevar por las olas.","El mar se calma después de la tormenta."],
+    ja:["水は常に道を見つける。","波に身を任せよう。","嵐の後、海は静まる。"],
+    pt:["A água sempre encontra seu caminho.","Deixe-se levar pelas ondas.","O mar se acalma após a tempestade."]},
+  foret:{fr:["La forêt ne se précipite pas, pourtant tout s'accomplit.","Respire l'air frais, vide ton esprit.","Les arbres grandissent lentement et deviennent forts."],
+    en:["The forest never hurries, yet everything is accomplished.","Breathe fresh air, clear your mind.","Trees grow slowly and become strong."],
+    es:["El bosque nunca se apresura, sin embargo todo se cumple.","Respira aire fresco, vacía tu mente.","Los árboles crecen lento y se vuelven fuertes."],
+    ja:["森は急がないが、すべてが成し遂げられる。","新鮮な空気を吸って、心を空にしよう。","木はゆっくり育ち、強くなる。"],
+    pt:["A floresta nunca se apressa, mas tudo se realiza.","Respire ar fresco, esvazie sua mente.","As árvores crescem devagar e ficam fortes."]},
+  soleil:{fr:["Chaque coucher de soleil est une promesse de demain.","La lumière chasse toujours l'obscurité.","Profite du moment présent, il ne reviendra pas."],
+    en:["Every sunset is a promise of tomorrow.","Light always chases away darkness.","Enjoy the present moment, it won't come back."],
+    es:["Cada puesta de sol es una promesa del mañana.","La luz siempre ahuyenta la oscuridad.","Disfruta el momento presente, no volverá."],
+    ja:["夕日は明日の約束。","光は常に闇を追い払う。","今この瞬間を楽しもう、戻ってこない。"],
+    pt:["Cada pôr do sol é uma promessa do amanhã.","A luz sempre afasta a escuridão.","Aproveite o momento presente, ele não volta."]},
+  espace:{fr:["Tu es fait de poussière d'étoiles.","L'univers est en toi.","Dans l'immensité, tu trouves la paix."],
+    en:["You are made of stardust.","The universe is within you.","In vastness, you find peace."],
+    es:["Estás hecho de polvo de estrellas.","El universo está en ti.","En la inmensidad, encuentras paz."],
+    ja:["あなたは星のかけらでできている。","宇宙はあなたの中にある。","広大さの中に平和を見つける。"],
+    pt:["Você é feito de poeira de estrelas.","O universo está em você.","Na imensidão, você encontra paz."]},
+  printemps:{fr:["Chaque fleur a pris le temps de pousser.","Le renouveau commence par un seul bourgeon.","La douceur du printemps apaise tout."],
+    en:["Every flower took time to bloom.","Renewal starts with a single bud.","Spring's gentleness soothes everything."],
+    es:["Cada flor tomó su tiempo para florecer.","La renovación empieza con un solo brote.","La suavidad de la primavera lo calma todo."],
+    ja:["すべての花は咲くのに時間がかかった。","再生は一つの芽から始まる。","春の優しさがすべてを和らげる。"],
+    pt:["Cada flor levou seu tempo para florescer.","A renovação começa com um único broto.","A suavidade da primavera acalma tudo."]},
+  ete:{fr:["Laisse le soleil réchauffer ton âme.","L'été, c'est la liberté retrouvée.","Chaque journée est une nouvelle chance."],
+    en:["Let the sun warm your soul.","Summer is freedom rediscovered.","Every day is a new chance."],
+    es:["Deja que el sol caliente tu alma.","El verano es libertad redescubierta.","Cada día es una nueva oportunidad."],
+    ja:["太陽に魂を温めてもらおう。","夏は自由を取り戻す季節。","毎日が新しいチャンス。"],
+    pt:["Deixe o sol aquecer sua alma.","O verão é a liberdade redescoberta.","Cada dia é uma nova chance."]},
+  automne:{fr:["Lâcher prise, comme les feuilles tombent.","La beauté est dans le changement.","Accepte ce qui est, libère ce qui était."],
+    en:["Let go, like leaves falling.","Beauty is in the change.","Accept what is, release what was."],
+    es:["Suéltate, como las hojas que caen.","La belleza está en el cambio.","Acepta lo que es, suelta lo que fue."],
+    ja:["葉が落ちるように手放そう。","美しさは変化の中にある。","今あるものを受け入れ、過去を手放そう。"],
+    pt:["Solte, como as folhas que caem.","A beleza está na mudança.","Aceite o que é, solte o que foi."]},
+  hiver:{fr:["Le silence de la neige apaise l'âme.","Dans le froid, trouve ta chaleur intérieure.","La paix est un manteau d'hiver."],
+    en:["The silence of snow soothes the soul.","In the cold, find your inner warmth.","Peace is a winter coat."],
+    es:["El silencio de la nieve calma el alma.","En el frío, encuentra tu calor interior.","La paz es un abrigo de invierno."],
+    ja:["雪の静寂が魂を癒す。","寒さの中に内なる温かさを見つけよう。","平和は冬のコート。"],
+    pt:["O silêncio da neve acalma a alma.","No frio, encontre seu calor interior.","A paz é um casaco de inverno."]}
+};
+
+// ═══════════════════════════════════════════════
+// THÈMES
+// ═══════════════════════════════════════════════
+const THEMES = [
+  {id:'ocean',icon:'🌊',name:{fr:'Océan',en:'Ocean',es:'Océano',ja:'海',pt:'Oceano'}},
+  {id:'foret',icon:'🌲',name:{fr:'Forêt',en:'Forest',es:'Bosque',ja:'森',pt:'Floresta'}},
+  {id:'soleil',icon:'🌅',name:{fr:'Coucher de soleil',en:'Sunset',es:'Atardecer',ja:'夕日',pt:'Pôr do sol'}},
+  {id:'espace',icon:'🌌',name:{fr:'Espace',en:'Space',es:'Espacio',ja:'宇宙',pt:'Espaço'}},
+  {id:'printemps',icon:'🌸',name:{fr:'Printemps',en:'Spring',es:'Primavera',ja:'春',pt:'Primavera'}},
+  {id:'ete',icon:'☀️',name:{fr:'Été',en:'Summer',es:'Verano',ja:'夏',pt:'Verão'}},
+  {id:'automne',icon:'🍂',name:{fr:'Automne',en:'Autumn',es:'Otoño',ja:'秋',pt:'Outono'}},
+  {id:'hiver',icon:'❄️',name:{fr:'Hiver',en:'Winter',es:'Invierno',ja:'冬',pt:'Inverno'}},
+];
+
+// ═══════════════════════════════════════════════
+// ÉTAT
+// ═══════════════════════════════════════════════
+const DATA_KEY = 'burst_v2';
+let data = (() => {
+  try { return Object.assign({
+    pseudo:'',code:'',langue:'',theme:'ocean',
+    totalPopped:0,totalFast:0,record:0,
+    bubblesCount:0,gravityCount:0,
+    sonOn:true,vibOn:true,ambianceOn:false,
+    sessionPopped:0
+  }, JSON.parse(localStorage.getItem(DATA_KEY))); }
+  catch { return {pseudo:'',code:'',langue:'',theme:'ocean',
+    totalPopped:0,totalFast:0,record:0,
+    bubblesCount:0,gravityCount:0,
+    sonOn:true,vibOn:true,ambianceOn:false,sessionPopped:0}; }
+})();
+
+function save() { localStorage.setItem(DATA_KEY, JSON.stringify(data)); }
+
+let langue = data.langue || navigator.language.substring(0,2);
+if (!T[langue]) langue = 'en';
+let t = T[langue];
+
+let mode = 'bubbles';
+let bubbles = [], count = 0, sessionStart = Date.now();
+let ax=0,ay=0,gx=0,gy=1,motionMag=0,motionGranted=false;
+let minX,maxX,minY,maxY,bL,bR,bT,bB;
+let W=window.innerWidth,H=window.innerHeight;
+let _uid=0;
+const uid=()=>++_uid;
+const rand=(a,b)=>a+Math.random()*(b-a);
+
+// AudioContext
+let audioCtx=null;
+function getAudioCtx(){
+  if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  return audioCtx;
+}
+
+// ═══════════════════════════════════════════════
+// DÉTECTION APPAREIL
+// ═══════════════════════════════════════════════
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+const isPC  = !('ontouchstart' in window) && !isIOS;
+
+// Dynamic Island : iPhone avec safe area top >= 59
+function hasDI() {
+  if (!isIOS || !/iPhone/.test(navigator.userAgent)) return false;
+  const top = parseInt(getComputedStyle(document.documentElement)
+    .getPropertyValue('--sat') || 0) || 0;
+  // Détection via safe area
+  const testEl = document.createElement('div');
+  testEl.style.cssText='position:fixed;top:env(safe-area-inset-top);height:1px;pointer-events:none';
+  document.body.appendChild(testEl);
+  const safeTop = testEl.offsetTop;
+  testEl.remove();
+  return safeTop >= 51;
+}
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+function init() {
+  applyLangue(langue);
+  applyTheme(data.theme);
+  buildThemeGrid();
+
+  if (hasDI()) {
+    document.getElementById('diRing').style.display = 'block';
+  }
+
+  // Si pas de profil → onboarding
+  if (!data.pseudo || !data.code) {
+    document.getElementById('profilePanel').style.display = 'flex';
+    document.getElementById('pseudoInput').placeholder = t.onboardMsg;
+    document.getElementById('onboardBtn').textContent = t.onboardBtn;
+    return;
+  }
+
+  startGame();
+}
+
+function startGame() {
+  document.getElementById('profilePanel').style.display = 'none';
+  computeBounds();
+  requestMotion();
+  spawnBubbles();
+  updateTagline();
+  showCitation();
+  updateDI();
+  requestAnimationFrame(loop);
+  scheduleSessionMsg();
+  emailjs.init('DpkTBB8S60Pgj0TxR');
+  setInterval(showCitation, 30000);
+}
+
+// ═══════════════════════════════════════════════
+// PROFIL
+// ═══════════════════════════════════════════════
+function genCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let c = 'BURST-';
+  for(let i=0;i<4;i++) c += chars[Math.floor(Math.random()*chars.length)];
+  c += '-';
+  for(let i=0;i<4;i++) c += chars[Math.floor(Math.random()*chars.length)];
+  return c;
+}
+
+function creerProfil() {
+  const pseudo = document.getElementById('pseudoInput').value.trim();
+  if (!pseudo) return;
+  data.pseudo = pseudo;
+  data.code = genCode();
+  save();
+  startGame();
+}
+
+function resetProfil() {
+  if(confirm(t.reset + ' ?')) {
+    data = {pseudo:'',code:'',langue:data.langue,theme:data.theme,
+      totalPopped:0,totalFast:0,record:0,
+      bubblesCount:0,gravityCount:0,sonOn:true,vibOn:true,
+      ambianceOn:false,sessionPopped:0};
+    save();
+    location.reload();
+  }
+}
+
+// ═══════════════════════════════════════════════
+// LANGUE & THÈME
+// ═══════════════════════════════════════════════
+function applyLangue(lg) {
+  langue = lg; t = T[lg];
+  data.langue = lg; save();
+  // Mettre à jour tous les textes
+  document.getElementById('tagline').textContent = t.tagBulles;
+  document.getElementById('countLbl').textContent = t.eclatees;
+  document.querySelectorAll('.lang-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.lang===lg);
+  });
+  // Update labels
+  const ids = {
+    settingsTitle:'parametres',themesTitle:'themes',
+    statsTitle:'stats',profilTitle:'profil',
+    lblLangue:'langue',lblAudio:'audio',lblSon:'son',
+    lblVibration:'vibration',lblAmbiance:'ambiance',
+    lblSession:'session',lblParMin:'parMin',
+    lblTotal:'total',lblTotalBulles:'totalBulles',
+    lblRecord:'record',lblModesPref:'modePref',
+    lblPartager:'partager',lblShare:'shareScore',
+    lblMonCode:'monCode',lblCodeSub:'codeSub',
+    lblCopier:'copier',lblPartagerCode:'partagerCode',
+    lblEmail:'recevoir',lblPseudo:'pseudo',
+    lblMonPseudo:'monPseudo',lblReset:'reset',
+    emailTitle:'recevoir2',emailSub:'emailSub',
+    lblEnvoyer:'envoyer',onboardMsg:'onboardMsg',
+    onboardBtn:'onboardBtn',permMsg:'permMsg',permBtn:'permBtn',
+  };
+  Object.entries(ids).forEach(([id,key])=>{
+    const el=document.getElementById(id);
+    if(el && t[key]) el.textContent=t[key];
+  });
+  document.getElementById('switchLabel').textContent =
+    mode==='bubbles' ? t.switchGravite : t.switchBulles;
+  updateTagline();
+  showCitation();
+}
+
+function setLangue(lg) { applyLangue(lg); }
+
+function applyTheme(th) {
+  data.theme = th; save();
+  document.getElementById('app').setAttribute('data-theme',
+    th==='ocean'?'':th);
+  document.querySelectorAll('.theme-card').forEach(c=>{
+    c.classList.toggle('active', c.dataset.theme===th);
+  });
+  updateDI();
+  showCitation();
+}
+
+function buildThemeGrid() {
+  const grid = document.getElementById('themeGrid');
+  grid.innerHTML = '';
+  THEMES.forEach(theme=>{
+    const card=document.createElement('div');
+    card.className='theme-card'+(data.theme===theme.id?' active':'');
+    card.dataset.theme=theme.id;
+    card.innerHTML=`<span class="theme-icon">${theme.icon}</span>
+      <span class="theme-name">${theme.name[langue]||theme.name.fr}</span>`;
+    card.onclick=()=>{ applyTheme(theme.id); };
+    grid.appendChild(card);
+  });
+}
+
+// ═══════════════════════════════════════════════
+// DYNAMIC ISLAND
+// ═══════════════════════════════════════════════
+function updateDI() {
+  const di=document.getElementById('diRing');
+  if(!di.style.display||di.style.display==='none') return;
+  const colors={
+    ocean:'#4dd9c0',foret:'#4dba6a',soleil:'#f09040',
+    espace:'#9b59f0',printemps:'#f059a0',ete:'#a0d040',
+    automne:'#d06820',hiver:'#80c8f0'
+  };
+  const c=colors[data.theme]||'#4dd9c0';
+  di.style.boxShadow=`0 0 0 1.5px ${c},0 0 12px ${c}44`;
+}
+
+// ═══════════════════════════════════════════════
+// CITATIONS
+// ═══════════════════════════════════════════════
+function showCitation() {
+  const th = data.theme in CITATIONS ? data.theme : 'ocean';
+  const list = CITATIONS[th][langue] || CITATIONS[th].fr;
+  const c = list[Math.floor(Math.random()*list.length)];
+  const el=document.getElementById('citation');
+  el.style.opacity='0';
+  setTimeout(()=>{ el.textContent='"'+c+'"'; el.style.opacity='1'; },500);
+}
+
+// ═══════════════════════════════════════════════
+// BOUNDS
+// ═══════════════════════════════════════════════
+function computeBounds() {
+  W=window.innerWidth; H=window.innerHeight;
+  const safeTop=100, safeBot=90;
+  const padX=isPC?30:20;
+  minX=padX; maxX=W-padX;
+  minY=safeTop; maxY=H-safeBot;
+  const mg=isPC?40:20;
+  bL=mg; bR=W-mg; bT=safeTop+10; bB=H-safeBot;
+  const gb=document.getElementById('gravBox');
+  gb.style.left=bL+'px'; gb.style.top=bT+'px';
+  gb.style.width=(bR-bL)+'px'; gb.style.height=(bB-bT)+'px';
+  document.getElementById('waveCanvas').width=W;
+  document.getElementById('waveCanvas').height=H;
+  document.getElementById('particleCanvas').width=W;
+  document.getElementById('particleCanvas').height=H;
+}
+
+// ═══════════════════════════════════════════════
+// TAILLE BULLES
+// ═══════════════════════════════════════════════
+function getBubbleSize() {
+  const sr = data.totalPopped<5?0.5:Math.min(data.totalFast/data.totalPopped,1);
+  const isPad=W>768;
+  const minS=(isPad?50:isPC?40:36)+(1-sr)*18;
+  const maxS=(isPad?108:isPC?80:78)+(1-sr)*20;
+  return [minS,maxS];
+}
+function getBubbleCount() { return W*H>520000?14:isPC?10:10; }
+
+// ═══════════════════════════════════════════════
+// BULLES DOM
+// ═══════════════════════════════════════════════
+function createBubble(x,y) {
+  const [minS,maxS]=getBubbleSize();
+  const size=rand(minS,maxS);
+  const id=uid();
+  const el=document.createElement('div');
+  el.className='bubble';
+  el.style.width=size+'px'; el.style.height=size+'px';
+  el.style.left='0'; el.style.top='0';
+  el.addEventListener('touchstart',e=>{ e.preventDefault(); e.stopPropagation(); popBubble(id); },{passive:false});
+  el.addEventListener('click',()=>popBubble(id));
+  const b={id,x,y,size,vx:0,vy:0,rot:0,spawnTime:Date.now(),el};
+  (mode==='bubbles'?document.getElementById('bubblesArea'):document.getElementById('gravityArea')).appendChild(el);
+  renderBubble(b);
+  return b;
+}
+
+function renderBubble(b) {
+  b.el.style.transform=`translate(${(b.x-b.size/2).toFixed(1)}px,${(b.y-b.size/2).toFixed(1)}px) rotate(${b.rot.toFixed(1)}deg)`;
+}
+
+// ═══════════════════════════════════════════════
+// POP
+// ═══════════════════════════════════════════════
+function popBubble(id,fromImpact=false) {
+  const idx=bubbles.findIndex(b=>b.id===id);
+  if(idx===-1) return;
+  const b=bubbles[idx];
+  const fast=Date.now()-b.spawnTime<2000;
+  data.totalPopped++; data.sessionPopped++;
+  if(fast) data.totalFast++;
+  count++; save();
+  spawnRipple(b.x,b.y,b.size);
+  spawnParticles(b.x,b.y);
+  if(data.sonOn) playPopSound();
+  if(data.vibOn&&navigator.vibrate) navigator.vibrate(fromImpact?18:12);
+  b.el.classList.add('popping');
+  bubbles.splice(idx,1);
+  setTimeout(()=>b.el.remove(),150);
+  document.getElementById('countNum').textContent=count;
+  document.getElementById('counter').classList.add('visible');
+  if(count>data.record){ data.record=count; save(); }
+  updateTagline();
+  const sr=data.totalPopped<5?0.5:Math.min(data.totalFast/data.totalPopped,1);
+  const delay=sr>0.65?rand(5000,9000):rand(3000,7000);
+  setTimeout(()=>{
+    let nb;
+    if(mode==='bubbles') nb=createBubble(rand(minX,maxX),rand(minY,maxY));
+    else{ const cx=(bL+bR)/2,cy=(bT+bB)/2; nb=createBubble(cx+rand(-70,70),cy+rand(-50,50)); }
+    bubbles.push(nb);
+  },delay);
+}
+
+// ═══════════════════════════════════════════════
+// RIPPLE
+// ═══════════════════════════════════════════════
+function spawnRipple(x,y,size) {
+  const el=document.createElement('div');
+  el.className='ripple';
+  el.style.left=x+'px'; el.style.top=y+'px';
+  el.style.width=size+'px'; el.style.height=size+'px';
+  (mode==='bubbles'?document.getElementById('bubblesArea'):document.getElementById('gravityArea')).appendChild(el);
+  setTimeout(()=>el.remove(),800);
+}
+
+// ═══════════════════════════════════════════════
+// PARTICULES CANVAS
+// ═══════════════════════════════════════════════
+let particles=[];
+function spawnParticles(x,y) {
+  const style=getComputedStyle(document.documentElement);
+  const p=style.getPropertyValue('--particle').trim()||'77,217,192';
+  for(let i=0;i<12;i++){
+    const angle=Math.random()*Math.PI*2;
+    const speed=rand(2,6);
+    particles.push({x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,
+      size:rand(3,8),opacity:1,color:`rgba(${p},`,life:1});
+  }
+}
+
+function updateParticles() {
+  const c=document.getElementById('particleCanvas');
+  const ctx=c.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  particles=particles.filter(p=>{
+    p.x+=p.vx; p.y+=p.vy; p.vy+=0.15;
+    p.opacity-=0.035; p.life-=0.035;
+    if(p.opacity>0){
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
+      ctx.fillStyle=p.color+p.opacity+')';
+      ctx.fill();
+    }
+    return p.opacity>0;
+  });
+}
+
+// ═══════════════════════════════════════════════
+// SON ASMR POP
+// ═══════════════════════════════════════════════
+function playPopSound() {
+  try {
+    const ctx=getAudioCtx();
+    const osc=ctx.createOscillator();
+    const gain=ctx.createGain();
+    const filter=ctx.createBiquadFilter();
+    filter.type='bandpass';
+    filter.frequency.value=800+Math.random()*400;
+    filter.Q.value=0.5;
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type='sine';
+    osc.frequency.setValueAtTime(600+Math.random()*200,ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(200,ctx.currentTime+0.15);
+    gain.gain.setValueAtTime(0.15,ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.15);
+    osc.start(); osc.stop(ctx.currentTime+0.15);
+  } catch(e){}
+}
+
+// ═══════════════════════════════════════════════
+// PHYSIQUE
+// ═══════════════════════════════════════════════
+function physicsBubbles() {
+  const DAMP=0.984,REST=0.70,BURST=8.5,MAX=14;
+  const toPop=new Set();
+  for(let i=0;i<bubbles.length;i++){
+    const b=bubbles[i];
+    b.vx=(b.vx+ax)*DAMP; b.vy=(b.vy+ay)*DAMP;
+    const s=Math.hypot(b.vx,b.vy); if(s>MAX){const f=MAX/s;b.vx*=f;b.vy*=f;}
+    b.x+=b.vx; b.y+=b.vy; b.rot+=b.vx*0.25;
+    const r=b.size/2; let imp=0;
+    if(b.x-r<minX){imp=Math.max(imp,Math.abs(b.vx));b.x=minX+r;b.vx=Math.abs(b.vx)*REST;}
+    if(b.x+r>maxX){imp=Math.max(imp,Math.abs(b.vx));b.x=maxX-r;b.vx=-Math.abs(b.vx)*REST;}
+    if(b.y-r<minY){imp=Math.max(imp,Math.abs(b.vy));b.y=minY+r;b.vy=Math.abs(b.vy)*REST;}
+    if(b.y+r>maxY){imp=Math.max(imp,Math.abs(b.vy));b.y=maxY-r;b.vy=-Math.abs(b.vy)*REST;}
+    if(imp>BURST)toPop.add(b.id);
+    renderBubble(b);
+  }
+  collisions(REST,BURST,toPop);
+  toPop.forEach(id=>popBubble(id,true));
+}
+
+function physicsGravity() {
+  const isDark=window.matchMedia('(prefers-color-scheme:dark)').matches;
+  const G=(1.05+Math.min(data.totalFast/Math.max(data.totalPopped,1),1)*0.65)*(isDark?0.68:1);
+  const DAMP=0.955,REST=0.62,BURST=10.5,MAX=18;
+  const toPop=new Set();
+  for(let i=0;i<bubbles.length;i++){
+    const b=bubbles[i];
+    b.vx=(b.vx+gx*G)*DAMP; b.vy=(b.vy+gy*G)*DAMP;
+    const s=Math.hypot(b.vx,b.vy); if(s>MAX){const f=MAX/s;b.vx*=f;b.vy*=f;}
+    b.x+=b.vx; b.y+=b.vy; b.rot+=b.vx*0.35;
+    const r=b.size/2; let imp=0;
+    if(b.x-r<bL){imp=Math.max(imp,Math.abs(b.vx));b.x=bL+r;b.vx=Math.abs(b.vx)*REST;}
+    if(b.x+r>bR){imp=Math.max(imp,Math.abs(b.vx));b.x=bR-r;b.vx=-Math.abs(b.vx)*REST;}
+    if(b.y-r<bT){imp=Math.max(imp,Math.abs(b.vy));b.y=bT+r;b.vy=Math.abs(b.vy)*REST;}
+    if(b.y+r>bB){imp=Math.max(imp,Math.abs(b.vy));b.y=bB-r;b.vy=-Math.abs(b.vy)*REST;}
+    if(imp>BURST)toPop.add(b.id);
+    renderBubble(b);
+  }
+  collisions(REST,BURST,toPop);
+  toPop.forEach(id=>popBubble(id,true));
+}
+
+function collisions(REST,BURST,toPop) {
+  for(let i=0;i<bubbles.length;i++){
+    for(let j=i+1;j<bubbles.length;j++){
+      const bi=bubbles[i],bj=bubbles[j];
+      const dx=bj.x-bi.x,dy=bj.y-bi.y,d2=dx*dx+dy*dy;
+      const md=(bi.size+bj.size)/2;
+      if(d2>=md*md||d2===0)continue;
+      const dist=Math.sqrt(d2),nx=dx/dist,ny=dy/dist,ov=(md-dist)/2;
+      bi.x-=nx*ov;bi.y-=ny*ov;bj.x+=nx*ov;bj.y+=ny*ov;
+      const dot=(bi.vx-bj.vx)*nx+(bi.vy-bj.vy)*ny;
+      bi.vx-=dot*nx*REST;bi.vy-=dot*ny*REST;
+      bj.vx+=dot*nx*REST;bj.vy+=dot*ny*REST;
+      if(Math.abs(dot)>BURST){toPop.add(bi.id);toPop.add(bj.id);}
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════
+// VAGUE
+// ═══════════════════════════════════════════════
+let wavePhase=0;
+const wCtx=document.getElementById('waveCanvas').getContext('2d');
+function drawWave() {
+  if(motionMag<0.07){document.getElementById('waveCanvas').classList.remove('active');return;}
+  document.getElementById('waveCanvas').classList.add('active');
+  wCtx.clearRect(0,0,W,H);
+  const amp=Math.min(motionMag*34,28);
+  const style=getComputedStyle(document.documentElement);
+  const p=style.getPropertyValue('--particle').trim()||'77,217,192';
+  wCtx.strokeStyle=`rgba(${p},${amp/88})`;
+  wCtx.lineWidth=1;
+  wCtx.beginPath(); wCtx.moveTo(0,H/2);
+  for(let x=0;x<=W;x+=4){
+    wCtx.lineTo(x,H/2+Math.sin(x/W*Math.PI*2.4+wavePhase)*amp);
+  }
+  wCtx.stroke();
+  wavePhase+=0.06;
+}
+
+// ═══════════════════════════════════════════════
+// ACCÉLÉROMÈTRE
+// ═══════════════════════════════════════════════
+let pax=0,pay=0,pgx=0,pgy=1;
+function handleMotion(e) {
+  const acc=e.accelerationIncludingGravity||e.acceleration;
+  if(!acc)return;
+  if(mode==='bubbles'){
+    const nx=-(acc.y||0)*0.27,ny=-(acc.x||0)*0.27;
+    motionMag=Math.hypot(nx-pax,ny-pay);
+    pax=ax;pay=ay;ax=nx;ay=ny;
+  } else {
+    const nx=-(acc.y||0),ny=-(acc.x||0);
+    motionMag=Math.hypot(nx-pgx,ny-pgy);
+    pgx=gx;pgy=gy;gx=nx;gy=ny;
+  }
+}
+
+async function requestMotion() {
+  if(typeof DeviceMotionEvent!=='undefined'&&
+     typeof DeviceMotionEvent.requestPermission==='function'){
+    try{
+      const p=await DeviceMotionEvent.requestPermission();
+      if(p==='granted'){window.addEventListener('devicemotion',handleMotion);motionGranted=true;document.getElementById('permOverlay').classList.remove('visible');}
+    }catch(e){}
+  } else {
+    window.addEventListener('devicemotion',handleMotion);
+    motionGranted=true;
+  }
+}
+
+// ═══════════════════════════════════════════════
+// PC : simuler l'accéléromètre avec la souris
+// ═══════════════════════════════════════════════
+if(isPC) {
+  let dragging=false,lmx=0,lmy=0;
+  document.addEventListener('mousedown',e=>{dragging=true;lmx=e.clientX;lmy=e.clientY;});
+  document.addEventListener('mouseup',()=>dragging=false);
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lmx,dy=e.clientY-lmy;
+    lmx=e.clientX;lmy=e.clientY;
+    const mag=Math.hypot(dx,dy)/30;
+    if(mode==='bubbles'){ax=dx/100*0.27;ay=dy/100*0.27;motionMag=mag;}
+    else{gx=dx/80;gy=dy/80;motionMag=mag;}
+  });
+}
+
+// ═══════════════════════════════════════════════
+// BOUCLE PRINCIPALE
+// ═══════════════════════════════════════════════
+function loop() {
+  if(mode==='bubbles') physicsBubbles();
+  else physicsGravity();
+  drawWave();
+  updateParticles();
+  requestAnimationFrame(loop);
+}
+
+// ═══════════════════════════════════════════════
+// SPAWN
+// ═══════════════════════════════════════════════
+function spawnBubbles() {
+  bubbles.forEach(b=>b.el.remove()); bubbles=[];
+  document.querySelectorAll('.ripple').forEach(e=>e.remove());
+  const n=getBubbleCount();
+  for(let i=0;i<n;i++){
+    let b;
+    if(mode==='bubbles') b=createBubble(rand(minX,maxX),rand(minY,maxY));
+    else{ const cx=(bL+bR)/2,cy=(bT+bB)/2; b=createBubble(cx+rand(-80,80),cy+rand(-60,60)); }
+    bubbles.push(b);
+  }
+}
+
+// ═══════════════════════════════════════════════
+// MODE SWITCH
+// ═══════════════════════════════════════════════
+function switchMode() {
+  mode=mode==='bubbles'?'gravity':'bubbles';
+  data[mode==='bubbles'?'bubblesCount':'gravityCount']++;
+  save();
+  document.getElementById('bubblesArea').classList.toggle('active',mode==='bubbles');
+  document.getElementById('gravityArea').classList.toggle('active',mode==='gravity');
+  document.getElementById('switchLabel').textContent=mode==='bubbles'?t.switchGravite:t.switchBulles;
+  if(mode==='gravity'&&!motionGranted) document.getElementById('permOverlay').classList.add('visible');
+  else if(mode==='gravity') requestMotion();
+  ax=0;ay=0;gx=0;gy=1;
+  updateTagline();
+  spawnBubbles();
+}
+
+// ═══════════════════════════════════════════════
+// UI
+// ═══════════════════════════════════════════════
+function updateTagline() {
+  const sr=data.totalPopped<5?0.5:Math.min(data.totalFast/Math.max(data.totalPopped,1),1);
+  const isDark=window.matchMedia('(prefers-color-scheme:dark)').matches;
+  let txt;
+  if(mode==='bubbles') txt=sr>0.65?t.tagVite:t.tagBulles;
+  else txt=isDark?t.tagNuit:t.tagGravite;
+  document.getElementById('tagline').textContent=txt;
+}
+
+function openPanel(id){ document.getElementById(id).classList.add('open'); }
+function closePanel(id){ document.getElementById(id).classList.remove('open'); }
+function openEmailPanel(){ closePanel('profilPanel'); openPanel('emailPanel'); }
+
+function updateStatsPanel() {
+  const mins=Math.max((Date.now()-sessionStart)/60000,0.1);
+  document.getElementById('sSession').textContent=count;
+  document.getElementById('sParMin').textContent=Math.round(count/mins);
+  document.getElementById('sTotal').textContent=data.totalPopped;
+  document.getElementById('sRecord').textContent=data.record;
+  const favMode=data.bubblesCount>=data.gravityCount?t.switchBulles:t.switchGravite;
+  document.getElementById('sMode').textContent=favMode;
+}
+
+function updateProfilPanel() {
+  document.getElementById('codeDisplay').textContent=data.code||'—';
+  document.getElementById('sPseudo').textContent=data.pseudo||'—';
+}
+
+function toggleAudio(){data.sonOn=document.getElementById('toggleSon').checked;save();}
+function toggleVibration(){data.vibOn=document.getElementById('toggleVib').checked;save();}
+function toggleAmbianceSound(){data.ambianceOn=document.getElementById('toggleAmbiance').checked;save();}
+
+function showToast(msg){ 
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+async function copyCode(){
+  try{await navigator.clipboard.writeText(data.code);showToast(t.codeCopie);}
+  catch{showToast(data.code);}
+}
+
+function shareCode(){
+  if(navigator.share){
+    navigator.share({title:'Burst',text:`Mon code Burst: ${data.code}`,url:window.location.href});
+  } else copyCode();
+}
+
+function shareScore(){
+  const txt=`${data.pseudo} a éclaté ${data.totalPopped} bulles sur Burst ! 🫧\n${window.location.href}`;
+  if(navigator.share) navigator.share({title:'Burst',text:txt});
+  else navigator.clipboard.writeText(txt).then(()=>showToast(t.codeCopie));
+}
+
+// ═══════════════════════════════════════════════
+// EMAIL
+// ═══════════════════════════════════════════════
+async function envoyerEmail(){
+  const email=document.getElementById('emailInput').value.trim();
+  if(!email||!email.includes('@'))return;
+  const lg=langue;
+  const tr=T[lg]||T.en;
+  try{
+    await emailjs.send('service_wjnmeus','gr3xkrq',{
+      email,
+      pseudo:data.pseudo,
+      code:data.code,
+      tagline:tr.tagline2,
+      greeting:tr.greeting,
+      intro:tr.intro,
+      instructions:tr.instructions,
+      signature:tr.signature,
+      subject:`${data.pseudo} — Burst 🫧`
+    });
+    showToast(tr.emailEnvoye);
+    closePanel('emailPanel');
+    document.getElementById('emailInput').value='';
+  }catch(e){showToast('Erreur envoi. Réessaie.');}
+}
+
+// ═══════════════════════════════════════════════
+// MESSAGE SESSION
+// ═══════════════════════════════════════════════
+function scheduleSessionMsg(){
+  setTimeout(()=>{
+    const mins=(Date.now()-sessionStart)/60000;
+    if(mins<3)return;
+    const isDark=window.matchMedia('(prefers-color-scheme:dark)').matches;
+    const el=document.getElementById('sessionMsg');
+    el.textContent=isDark?t.sessionMsg1:t.sessionMsg2;
+    el.classList.add('visible');
+    setTimeout(()=>el.classList.remove('visible'),4500);
+  },180000);
+}
+
+// ═══════════════════════════════════════════════
+// ÉVÉNEMENTS
+// ═══════════════════════════════════════════════
+document.getElementById('switchBtn').addEventListener('click',switchMode);
+document.getElementById('themeBtn').addEventListener('click',()=>{ buildThemeGrid(); openPanel('themesPanel'); });
+document.getElementById('statsBtn').addEventListener('click',()=>{ updateStatsPanel(); openPanel('statsPanel'); });
+document.getElementById('settingsBtn').addEventListener('click',()=>{
+  document.getElementById('toggleSon').checked=data.sonOn;
+  document.getElementById('toggleVib').checked=data.vibOn;
+  document.getElementById('toggleAmbiance').checked=data.ambianceOn;
+  openPanel('settingsPanel');
+});
+document.getElementById('profileBtn').addEventListener('click',()=>{ updateProfilPanel(); openPanel('profilPanel'); });
+document.getElementById('permOverlay').addEventListener('click',requestMotion);
+document.getElementById('pseudoInput').addEventListener('keydown',e=>{ if(e.key==='Enter') creerProfil(); });
+
+window.addEventListener('resize',()=>{ computeBounds(); spawnBubbles(); });
+
+// Activer audio au premier touch (iOS)
+document.addEventListener('touchstart',()=>{ try{getAudioCtx().resume();}catch(e){} },{once:true});
+document.addEventListener('click',()=>{ try{getAudioCtx().resume();}catch(e){} },{once:true});
+
+// ═══════════════════════════════════════════════
+// SERVICE WORKER
+// ═══════════════════════════════════════════════
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+
+// ═══════════════════════════════════════════════
+// LANCEMENT
+// ═══════════════════════════════════════════════
+init();
+</script>
+</body>
+</html>
