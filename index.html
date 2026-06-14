@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BURST - ASMR</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-rain"> <!-- Pluie par défaut -->
+
+    <header id="app-header">
+        <h1>BURST</h1>
+        <button id="settings-btn">⚙️</button>
+    </header>
+
+    <!-- Le moteur physique -->
+    <div id="game-container"></div>
+    
+    <!-- Les effets météo par-dessus les bulles -->
+    <div id="weather-layer"></div>
+
+    <!-- Les nouvelles commandes ASMR -->
+    <div id="controls-container">
+        <button id="toggle-pop" class="active">Éclatement : OUI</button>
+        
+        <div id="season-selector">
+            <button class="season-btn" data-theme="sun">☀️</button>
+            <button class="season-btn active" data-theme="rain">🌧️</button>
+            <button class="season-btn" data-theme="storm">⛈️</button>
+            <button class="season-btn" data-theme="snow">❄️</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
