@@ -1,37 +1,1068 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BURST - ASMR</title>
-    <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Burst">
+<meta name="theme-color" content="#010207">
+<link rel="manifest" href="manifest.json">
+<title>Burst</title>
+<style>
+
+/* ── Reset & Variables ─────────────────────────────────── */
+*, *::before, *::after {
+  margin: 0; padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:root {
+  --bg:         #020e21;
+  --accent:     #4dd9c0;
+  --accent2:    #a8f0e4;
+  --text:       #ffffff;
+  --text-sub:   rgba(255,255,255,0.44);
+  --text-dim:   rgba(255,255,255,0.18);
+  --box-stroke: rgba(255,255,255,0.07);
+  --b-shine:    0.42;
+  --grav-mult:  1;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:         #010207;
+    --text-sub:   rgba(255,255,255,0.32);
+    --text-dim:   rgba(255,255,255,0.13);
+    --box-stroke: rgba(255,255,255,0.04);
+    --b-shine:    0.22;
+    --grav-mult:  0.68;
+  }
+}
+
+html, body {
+  width: 100%; height: 100%; height: 100dvh;
+  overflow: hidden;
+  background: var(--bg);
+  font-family: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  transition: background 1s ease;
+}
+
+/* ── App container ──────────────────────────────────────── */
+#app {
+  position: fixed; inset: 0;
+  overflow: hidden;
+}
+
+/* ── Wave canvas ────────────────────────────────────────── */
+#waveCanvas {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+#waveCanvas.active { opacity: 1; }
+
+/* ── Dynamic Island ring ────────────────────────────────── */
+#diRing {
+  position: fixed;
+  top: 11px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  pointer-events: none;
+  width: 133px; height: 44px;
+}
+.di-pill {
+  position: absolute;
+  top: 3.5px; left: 3.5px;
+  width: 126px; height: 37px;
+  background: black;
+  border-radius: 18.5px;
+}
+.di-arc {
+  position: absolute; inset: 0;
+  border-radius: 22px;
+  border: 2px solid transparent;
+  border-top-color: var(--accent);
+  border-right-color: var(--accent);
+  opacity: 0.75;
+  animation: spinArc 9s linear infinite;
+}
+@keyframes spinArc {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ── Header ─────────────────────────────────────────────── */
+#header {
+  position: fixed; top: 0; left: 0; right: 0;
+  padding-top: max(env(safe-area-inset-top, 44px), 44px);
+  padding-top: calc(max(env(safe-area-inset-top, 44px), 44px) + 10px);
+  padding-left: 28px; padding-right: 28px;
+  display: flex; align-items: center;
+  justify-content: space-between;
+  z-index: 20;
+}
+.logo {
+  font-size: 12px; font-weight: 300;
+  letter-spacing: 0.45em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+#gearBtn {
+  background: none; border: none;
+  color: var(--text-sub);
+  font-size: 17px; cursor: pointer;
+  padding: 8px; opacity: 0.75;
+}
+
+/* ── Tagline ─────────────────────────────────────────────── */
+#tagline {
+  position: fixed;
+  top: 92px; left: 28px; right: 28px;
+  font-size: 10px; font-weight: 200;
+  letter-spacing: 0.2em;
+  color: var(--text-sub);
+  z-index: 5; pointer-events: none;
+}
+
+/* ── Counter ─────────────────────────────────────────────── */
+#counter {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  z-index: 3; pointer-events: none;
+  opacity: 0; transition: opacity 0.5s;
+}
+#counter.visible { opacity: 1; }
+#countNum {
+  display: block;
+  font-size: clamp(50px, 16vw, 74px);
+  font-weight: 100;
+  color: var(--text-dim);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.count-lbl {
+  font-size: 10px; font-weight: 200;
+  letter-spacing: 0.35em;
+  color: var(--text-dim);
+}
+
+/* ── Game areas ──────────────────────────────────────────── */
+.game-area {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.game-area.active { pointer-events: auto; }
+
+/* ── Gravity box border ──────────────────────────────────── */
+#gravBox {
+  position: absolute;
+  border: 1px solid var(--box-stroke);
+  border-radius: 24px;
+  pointer-events: none;
+}
+
+/* ── Bubble ──────────────────────────────────────────────── */
+.bubble {
+  position: absolute;
+  border-radius: 50%;
+  cursor: pointer;
+  pointer-events: auto;
+  will-change: transform;
+  background: radial-gradient(circle at 34% 28%,
+    rgba(255,255,255,var(--b-shine)) 0%,
+    rgba(255,255,255,0.05) 35%,
+    rgba(77,217,192,0.08) 65%,
+    rgba(77,217,192,0.14) 100%
+  );
+  border: 1px solid rgba(255,255,255,0.28);
+  box-shadow:
+    inset 0 2px 10px rgba(255,255,255,0.16),
+    inset 0 -1px 5px rgba(77,217,192,0.08),
+    0 8px 28px rgba(0,0,0,0.32),
+    0 2px 6px rgba(77,217,192,0.1);
+  overflow: hidden;
+}
+/* Main shine */
+.bubble::before {
+  content: '';
+  position: absolute;
+  top: 13%; left: 16%;
+  width: 31%; height: 19%;
+  background: rgba(255,255,255,0.58);
+  border-radius: 50%;
+  filter: blur(3px);
+  transform: rotate(-15deg);
+}
+/* Secondary shine */
+.bubble::after {
+  content: '';
+  position: absolute;
+  bottom: 20%; right: 17%;
+  width: 11%; height: 7%;
+  background: rgba(168,240,228,0.55);
+  border-radius: 50%;
+  filter: blur(1.5px);
+}
+/* Pop animation */
+.bubble.popping {
+  transform: scale(1.35) !important;
+  opacity: 0 !important;
+  transition: transform 0.13s ease, opacity 0.13s ease !important;
+}
+
+/* ── Ripple ──────────────────────────────────────────────── */
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  border: 1.5px solid rgba(77,217,192,0.55);
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0);
+  animation: rippleOut 0.75s ease-out forwards;
+}
+@keyframes rippleOut {
+  0%   { transform: translate(-50%,-50%) scale(0);   opacity: 1; }
+  100% { transform: translate(-50%,-50%) scale(3.5); opacity: 0; }
+}
+
+/* ── Switch button ───────────────────────────────────────── */
+#switchBtn {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom, 34px) + 14px);
+  left: 50%; transform: translateX(-50%);
+  z-index: 20;
+  display: flex; align-items: center; gap: 6px;
+  padding: 11px 22px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.11);
+  border-radius: 100px;
+  color: var(--text-sub);
+  font-size: 11px; font-weight: 300;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  white-space: nowrap;
+  transition: all 0.3s ease;
+}
+
+/* ── Session message ─────────────────────────────────────── */
+#sessionMsg {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom, 34px) + 72px);
+  left: 50%; transform: translateX(-50%);
+  font-size: 11px; font-weight: 200;
+  color: var(--text-sub);
+  letter-spacing: 0.18em;
+  text-align: center;
+  z-index: 20; pointer-events: none;
+  opacity: 0; transition: opacity 0.5s;
+  white-space: nowrap;
+}
+#sessionMsg.visible { opacity: 1; }
+
+/* ── Settings panel ──────────────────────────────────────── */
+#settingsPanel {
+  position: fixed; inset: 0;
+  background: var(--bg);
+  z-index: 50;
+  display: flex; flex-direction: column;
+  padding: calc(max(env(safe-area-inset-top,44px),44px) + 20px) 28px 40px;
+  transform: translateY(100%);
+  transition: transform 0.4s cubic-bezier(0.34,1.2,0.64,1);
+}
+#settingsPanel.open { transform: translateY(0); }
+
+.s-header {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  margin-bottom: 36px;
+}
+.s-title {
+  font-size: 11px; font-weight: 300;
+  letter-spacing: 0.5em;
+  color: var(--text);
+}
+#closeBtn {
+  background: none; border: none;
+  color: var(--text-sub);
+  font-size: 20px; cursor: pointer;
+  padding: 8px;
+}
+.s-section {
+  font-size: 9px; font-weight: 300;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: var(--text-sub);
+  margin-bottom: 18px;
+}
+.stat-row {
+  display: flex; justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.stat-label {
+  font-size: 11px; font-weight: 200;
+  color: var(--text-sub); letter-spacing: 0.1em;
+}
+.stat-val {
+  font-size: 11px; font-weight: 300;
+  color: var(--text);
+}
+.divider {
+  height: 1px;
+  background: rgba(255,255,255,0.08);
+  margin: 24px 0;
+}
+#resetBtn {
+  background: none; border: none;
+  color: var(--text-sub);
+  font-size: 11px; font-weight: 300;
+  letter-spacing: 0.2em;
+  cursor: pointer; padding: 8px 0;
+}
+.s-footer {
+  margin-top: auto;
+  text-align: center;
+  font-size: 9px; font-weight: 200;
+  color: rgba(255,255,255,0.18);
+  letter-spacing: 0.3em;
+}
+
+/* ── Permission overlay ──────────────────────────────────── */
+#permOverlay {
+  position: fixed; inset: 0;
+  z-index: 40;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 16px;
+  background: rgba(1,2,7,0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.3s;
+}
+#permOverlay.visible { opacity: 1; pointer-events: auto; }
+#permOverlay p {
+  font-size: 14px; font-weight: 200;
+  color: var(--text-sub);
+  letter-spacing: 0.12em;
+  text-align: center;
+  max-width: 260px; line-height: 1.7;
+}
+#grantBtn {
+  padding: 13px 30px;
+  background: rgba(77,217,192,0.14);
+  border: 1px solid rgba(77,217,192,0.35);
+  border-radius: 100px;
+  color: var(--accent2);
+  font-size: 12px; font-weight: 300;
+  letter-spacing: 0.15em;
+  cursor: pointer;
+}
+
+</style>
 </head>
-<body class="theme-rain"> <!-- Pluie par défaut -->
+<body>
+<div id="app">
 
-    <header id="app-header">
-        <h1>BURST</h1>
-        <button id="settings-btn">⚙️</button>
-    </header>
+  <!-- Wave canvas -->
+  <canvas id="waveCanvas"></canvas>
 
-    <!-- Le moteur physique -->
-    <div id="game-container"></div>
-    
-    <!-- Les effets météo par-dessus les bulles -->
-    <div id="weather-layer"></div>
+  <!-- Dynamic Island ring -->
+  <div id="diRing">
+    <div class="di-pill"></div>
+    <div class="di-arc" id="diArc"></div>
+  </div>
 
-    <!-- Les nouvelles commandes ASMR -->
-    <div id="controls-container">
-        <button id="toggle-pop" class="active">Éclatement : OUI</button>
-        
-        <div id="season-selector">
-            <button class="season-btn" data-theme="sun">☀️</button>
-            <button class="season-btn active" data-theme="rain">🌧️</button>
-            <button class="season-btn" data-theme="storm">⛈️</button>
-            <button class="season-btn" data-theme="snow">❄️</button>
-        </div>
+  <!-- Header -->
+  <div id="header">
+    <span class="logo">BURST</span>
+    <button id="gearBtn">⚙</button>
+  </div>
+
+  <!-- Tagline -->
+  <div id="tagline">respire · éclate · relâche</div>
+
+  <!-- Counter -->
+  <div id="counter">
+    <span id="countNum">0</span>
+    <span class="count-lbl">éclatées</span>
+  </div>
+
+  <!-- Bubbles area -->
+  <div id="bubblesArea" class="game-area active"></div>
+
+  <!-- Gravity area -->
+  <div id="gravityArea" class="game-area">
+    <div id="gravBox"></div>
+  </div>
+
+  <!-- Switch button -->
+  <button id="switchBtn">🌊 Gravité</button>
+
+  <!-- Session message -->
+  <div id="sessionMsg"></div>
+
+  <!-- Settings panel -->
+  <div id="settingsPanel">
+    <div class="s-header">
+      <span class="s-title">PARAMÈTRES</span>
+      <button id="closeBtn">✕</button>
     </div>
+    <div class="s-section">Ton profil</div>
+    <div class="stat-row">
+      <span class="stat-label">Bulles éclatées</span>
+      <span class="stat-val" id="sPopped">0</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Mode préféré</span>
+      <span class="stat-val" id="sMode">Bulles 💧</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Rythme</span>
+      <span class="stat-val" id="sRhythm">—</span>
+    </div>
+    <div class="divider"></div>
+    <button id="resetBtn">Réinitialiser le profil</button>
+    <div class="s-footer">Burst · fait avec 💙</div>
+  </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
-    <script src="app.js"></script>
+  <!-- Permission overlay -->
+  <div id="permOverlay">
+    <p>Autorise l'accès au mouvement pour activer la gravité</p>
+    <button id="grantBtn">Activer</button>
+  </div>
+
+</div>
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+// 1. COMPORTEMENT UTILISATEUR (localStorage)
+// ═══════════════════════════════════════════════════════════
+
+const BEH_KEY = 'burst_v1';
+
+function defaultBeh() {
+  return { totalPopped:0, totalFast:0, preferredMode:'bubbles', bubblesCount:0, gravityCount:0 };
+}
+
+function loadBeh() {
+  try { return Object.assign(defaultBeh(), JSON.parse(localStorage.getItem(BEH_KEY))); }
+  catch { return defaultBeh(); }
+}
+
+function saveBeh() {
+  localStorage.setItem(BEH_KEY, JSON.stringify(beh));
+}
+
+let beh = loadBeh();
+
+function speedRatio() {
+  if (beh.totalPopped < 5) return 0.5;
+  return Math.min(beh.totalFast / beh.totalPopped, 1);
+}
+
+function getBubbleCount() {
+  return (window.innerWidth * window.innerHeight > 520000) ? 14 : 10;
+}
+
+function getBubbleSizeRange() {
+  const sr = speedRatio();
+  const isPad = window.innerWidth > 768;
+  return [
+    (isPad ? 50 : 38) + (1 - sr) * 20,
+    (isPad ? 108 : 80) + (1 - sr) * 22
+  ];
+}
+
+function recordPop(fast) {
+  beh.totalPopped++;
+  if (fast) beh.totalFast++;
+  saveBeh();
+}
+
+function recordMode(m) {
+  if (m === 'bubbles') beh.bubblesCount++;
+  else beh.gravityCount++;
+  beh.preferredMode = beh.bubblesCount >= beh.gravityCount ? 'bubbles' : 'gravity';
+  saveBeh();
+}
+
+// ═══════════════════════════════════════════════════════════
+// 2. ÉTAT DE L'APP
+// ═══════════════════════════════════════════════════════════
+
+let mode = beh.preferredMode;
+let bubbles = [];
+let count = 0;
+let motionGranted = false;
+let sessionStart = Date.now();
+
+// Accélération (mode bulles)
+let ax = 0, ay = 0;
+// Gravité (mode gravité)
+let gx = 0, gy = 1;
+// Intensité mouvement
+let motionMag = 0;
+
+// Limites du mode bulles
+let minX, maxX, minY, maxY;
+// Limites de la boîte gravité
+let bL, bR, bT, bB;
+
+// ═══════════════════════════════════════════════════════════
+// 3. ÉLÉMENTS DOM
+// ═══════════════════════════════════════════════════════════
+
+const waveCanvas   = document.getElementById('waveCanvas');
+const wCtx         = waveCanvas.getContext('2d');
+const bubblesArea  = document.getElementById('bubblesArea');
+const gravityArea  = document.getElementById('gravityArea');
+const gravBox      = document.getElementById('gravBox');
+const taglineEl    = document.getElementById('tagline');
+const counterEl    = document.getElementById('counter');
+const countNumEl   = document.getElementById('countNum');
+const switchBtn    = document.getElementById('switchBtn');
+const sessionMsgEl = document.getElementById('sessionMsg');
+const settingsPanel = document.getElementById('settingsPanel');
+const permOverlay  = document.getElementById('permOverlay');
+const diArc        = document.getElementById('diArc');
+
+// ═══════════════════════════════════════════════════════════
+// 4. LIMITES & REDIMENSIONNEMENT
+// ═══════════════════════════════════════════════════════════
+
+function computeBounds() {
+  const W = window.innerWidth, H = window.innerHeight;
+  const padX = 22, padTop = 92, padBot = 80;
+
+  minX = padX;  maxX = W - padX;
+  minY = padTop; maxY = H - padBot;
+
+  const mg = 20;
+  bL = mg;  bR = W - mg;
+  bT = mg + 95;  bB = H - mg - 80;
+
+  gravBox.style.left   = bL + 'px';
+  gravBox.style.top    = bT + 'px';
+  gravBox.style.width  = (bR - bL) + 'px';
+  gravBox.style.height = (bB - bT) + 'px';
+
+  waveCanvas.width  = W;
+  waveCanvas.height = H;
+}
+
+window.addEventListener('resize', () => {
+  computeBounds();
+  clearBubbles();
+  spawnBubbles();
+});
+
+// ═══════════════════════════════════════════════════════════
+// 5. UTILITAIRES
+// ═══════════════════════════════════════════════════════════
+
+let _uid = 0;
+function uid() { return ++_uid; }
+function rand(a, b) { return a + Math.random() * (b - a); }
+function vibrate(ms) { if (navigator.vibrate) navigator.vibrate(ms); }
+
+// ═══════════════════════════════════════════════════════════
+// 6. GESTION DES BULLES
+// ═══════════════════════════════════════════════════════════
+
+function createBubble(x, y) {
+  const [minS, maxS] = getBubbleSizeRange();
+  const size = rand(minS, maxS);
+  const id = uid();
+
+  const el = document.createElement('div');
+  el.className = 'bubble';
+  el.style.width  = size + 'px';
+  el.style.height = size + 'px';
+  el.style.left = '0';
+  el.style.top  = '0';
+
+  // Événements tactiles et clic
+  el.addEventListener('touchstart', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    popBubble(id);
+  }, { passive: false });
+  el.addEventListener('click', () => popBubble(id));
+
+  const b = { id, x, y, size, vx: 0, vy: 0, rot: 0, spawnTime: Date.now(), el };
+
+  const area = mode === 'bubbles' ? bubblesArea : gravityArea;
+  area.appendChild(el);
+  renderBubble(b);
+  return b;
+}
+
+function renderBubble(b) {
+  const tx = (b.x - b.size / 2).toFixed(1);
+  const ty = (b.y - b.size / 2).toFixed(1);
+  const r  = b.rot.toFixed(1);
+  b.el.style.transform = `translate(${tx}px, ${ty}px) rotate(${r}deg)`;
+}
+
+function spawnRipple(x, y, size) {
+  const el = document.createElement('div');
+  el.className = 'ripple';
+  el.style.left   = x + 'px';
+  el.style.top    = y + 'px';
+  el.style.width  = size + 'px';
+  el.style.height = size + 'px';
+  (mode === 'bubbles' ? bubblesArea : gravityArea).appendChild(el);
+  setTimeout(() => el.remove(), 800);
+}
+
+function popBubble(id, fromImpact = false) {
+  const idx = bubbles.findIndex(b => b.id === id);
+  if (idx === -1) return;
+  const b = bubbles[idx];
+
+  const fast = (Date.now() - b.spawnTime) < 2000;
+  recordPop(fast);
+  spawnRipple(b.x, b.y, b.size);
+
+  // Animation de pop
+  b.el.classList.add('popping');
+  bubbles.splice(idx, 1);
+  setTimeout(() => b.el.remove(), 150);
+
+  count++;
+  countNumEl.textContent = count;
+  counterEl.classList.add('visible');
+  updateTagline();
+
+  vibrate(fromImpact ? 18 : 12);
+
+  // Respawn avec délai adaptatif
+  const delay = speedRatio() > 0.65
+    ? rand(5000, 9000)
+    : rand(3000, 7000);
+
+  setTimeout(() => {
+    let nb;
+    if (mode === 'bubbles') {
+      nb = createBubble(rand(minX, maxX), rand(minY, maxY));
+    } else {
+      const cx = (bL + bR) / 2, cy = (bT + bB) / 2;
+      nb = createBubble(cx + rand(-70, 70), cy + rand(-50, 50));
+    }
+    bubbles.push(nb);
+  }, delay);
+}
+
+function spawnBubbles() {
+  const n = getBubbleCount();
+  for (let i = 0; i < n; i++) {
+    let b;
+    if (mode === 'bubbles') {
+      b = createBubble(rand(minX, maxX), rand(minY, maxY));
+    } else {
+      const cx = (bL + bR) / 2, cy = (bT + bB) / 2;
+      b = createBubble(cx + rand(-80, 80), cy + rand(-60, 60));
+    }
+    bubbles.push(b);
+  }
+}
+
+function clearBubbles() {
+  bubbles.forEach(b => b.el.remove());
+  bubbles = [];
+  document.querySelectorAll('.ripple').forEach(el => el.remove());
+}
+
+// ═══════════════════════════════════════════════════════════
+// 7. PHYSIQUE
+// ═══════════════════════════════════════════════════════════
+
+function updatePhysics() {
+  if (mode === 'bubbles') physicsBubbles();
+  else physicsGravity();
+}
+
+function physicsBubbles() {
+  const DAMP = 0.984, REST = 0.70, BURST = 8.5, MAX_SPD = 14;
+  const toPop = new Set();
+
+  for (let i = 0; i < bubbles.length; i++) {
+    const b = bubbles[i];
+
+    b.vx = (b.vx + ax) * DAMP;
+    b.vy = (b.vy + ay) * DAMP;
+
+    // Vitesse max
+    const spd = Math.hypot(b.vx, b.vy);
+    if (spd > MAX_SPD) { const f = MAX_SPD / spd; b.vx *= f; b.vy *= f; }
+
+    b.x  += b.vx;
+    b.y  += b.vy;
+    b.rot += b.vx * 0.25;
+
+    const r = b.size / 2;
+    let impact = 0;
+
+    if (b.x - r < minX) { impact = Math.max(impact, Math.abs(b.vx)); b.x = minX + r; b.vx =  Math.abs(b.vx) * REST; }
+    if (b.x + r > maxX) { impact = Math.max(impact, Math.abs(b.vx)); b.x = maxX - r; b.vx = -Math.abs(b.vx) * REST; }
+    if (b.y - r < minY) { impact = Math.max(impact, Math.abs(b.vy)); b.y = minY + r; b.vy =  Math.abs(b.vy) * REST; }
+    if (b.y + r > maxY) { impact = Math.max(impact, Math.abs(b.vy)); b.y = maxY - r; b.vy = -Math.abs(b.vy) * REST; }
+
+    if (impact > BURST) toPop.add(b.id);
+    renderBubble(b);
+  }
+
+  // Collisions bulle-bulle
+  for (let i = 0; i < bubbles.length; i++) {
+    for (let j = i + 1; j < bubbles.length; j++) {
+      const bi = bubbles[i], bj = bubbles[j];
+      const dx = bj.x - bi.x, dy = bj.y - bi.y;
+      const d2 = dx * dx + dy * dy;
+      const md = (bi.size + bj.size) / 2;
+      if (d2 >= md * md || d2 === 0) continue;
+
+      const dist = Math.sqrt(d2);
+      const nx = dx / dist, ny = dy / dist;
+      const ov = (md - dist) / 2;
+      bi.x -= nx * ov; bi.y -= ny * ov;
+      bj.x += nx * ov; bj.y += ny * ov;
+
+      const dot = (bi.vx - bj.vx) * nx + (bi.vy - bj.vy) * ny;
+      bi.vx -= dot * nx * REST; bi.vy -= dot * ny * REST;
+      bj.vx += dot * nx * REST; bj.vy += dot * ny * REST;
+
+      if (Math.abs(dot) > BURST) { toPop.add(bi.id); toPop.add(bj.id); }
+    }
+  }
+
+  toPop.forEach(id => popBubble(id, true));
+}
+
+function physicsGravity() {
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const GRAVITY = (1.05 + speedRatio() * 0.65) * (isDark ? 0.68 : 1.0);
+  const DAMP = 0.955, REST = 0.62, BURST = 10.5, MAX_SPD = 18;
+  const toPop = new Set();
+
+  for (let i = 0; i < bubbles.length; i++) {
+    const b = bubbles[i];
+
+    b.vx = (b.vx + gx * GRAVITY) * DAMP;
+    b.vy = (b.vy + gy * GRAVITY) * DAMP;
+
+    const spd = Math.hypot(b.vx, b.vy);
+    if (spd > MAX_SPD) { const f = MAX_SPD / spd; b.vx *= f; b.vy *= f; }
+
+    b.x  += b.vx;
+    b.y  += b.vy;
+    b.rot += b.vx * 0.35;
+
+    const r = b.size / 2;
+    let impact = 0;
+
+    if (b.x - r < bL) { impact = Math.max(impact, Math.abs(b.vx)); b.x = bL + r; b.vx =  Math.abs(b.vx) * REST; }
+    if (b.x + r > bR) { impact = Math.max(impact, Math.abs(b.vx)); b.x = bR - r; b.vx = -Math.abs(b.vx) * REST; }
+    if (b.y - r < bT) { impact = Math.max(impact, Math.abs(b.vy)); b.y = bT + r; b.vy =  Math.abs(b.vy) * REST; }
+    if (b.y + r > bB) { impact = Math.max(impact, Math.abs(b.vy)); b.y = bB - r; b.vy = -Math.abs(b.vy) * REST; }
+
+    if (impact > BURST) toPop.add(b.id);
+    renderBubble(b);
+  }
+
+  for (let i = 0; i < bubbles.length; i++) {
+    for (let j = i + 1; j < bubbles.length; j++) {
+      const bi = bubbles[i], bj = bubbles[j];
+      const dx = bj.x - bi.x, dy = bj.y - bi.y;
+      const d2 = dx * dx + dy * dy;
+      const md = (bi.size + bj.size) / 2;
+      if (d2 >= md * md || d2 === 0) continue;
+
+      const dist = Math.sqrt(d2);
+      const nx = dx / dist, ny = dy / dist;
+      const ov = (md - dist) / 2;
+      bi.x -= nx * ov; bi.y -= ny * ov;
+      bj.x += nx * ov; bj.y += ny * ov;
+
+      const dot = (bi.vx - bj.vx) * nx + (bi.vy - bj.vy) * ny;
+      bi.vx -= dot * nx * REST; bi.vy -= dot * ny * REST;
+      bj.vx += dot * nx * REST; bj.vy += dot * ny * REST;
+
+      if (Math.abs(dot) > BURST) { toPop.add(bi.id); toPop.add(bj.id); }
+    }
+  }
+
+  toPop.forEach(id => popBubble(id, true));
+}
+
+// ═══════════════════════════════════════════════════════════
+// 8. VAGUE CANVAS
+// ═══════════════════════════════════════════════════════════
+
+let wavePhase = 0;
+
+function drawWave() {
+  if (motionMag < 0.07) {
+    waveCanvas.classList.remove('active');
+    return;
+  }
+  waveCanvas.classList.add('active');
+
+  const W = waveCanvas.width, H = waveCanvas.height;
+  const amp = Math.min(motionMag * 34, 28);
+
+  wCtx.clearRect(0, 0, W, H);
+  wCtx.strokeStyle = `rgba(77,217,192,${amp / 88})`;
+  wCtx.lineWidth = 1;
+  wCtx.beginPath();
+  wCtx.moveTo(0, H / 2);
+  for (let x = 0; x <= W; x += 4) {
+    const y = H / 2 + Math.sin(x / W * Math.PI * 2.4 + wavePhase) * amp;
+    wCtx.lineTo(x, y);
+  }
+  wCtx.stroke();
+  wavePhase += 0.06;
+}
+
+// ═══════════════════════════════════════════════════════════
+// 9. ACCÉLÉROMÈTRE
+// ═══════════════════════════════════════════════════════════
+
+let prevAx = 0, prevAy = 0, prevGx = 0, prevGy = 1;
+
+function handleMotion(e) {
+  const acc = e.accelerationIncludingGravity || e.acceleration;
+  if (!acc) return;
+
+  if (mode === 'bubbles') {
+    const nax = -(acc.y || 0) * 0.27;
+    const nay = -(acc.x || 0) * 0.27;
+    motionMag = Math.hypot(nax - prevAx, nay - prevAy);
+    prevAx = ax; prevAy = ay;
+    ax = nax; ay = nay;
+  } else {
+    const ngx = -(acc.y || 0);
+    const ngy = -(acc.x || 0);
+    motionMag = Math.hypot(ngx - prevGx, ngy - prevGy);
+    prevGx = gx; prevGy = gy;
+    gx = ngx; gy = ngy;
+  }
+}
+
+async function requestMotion() {
+  if (typeof DeviceMotionEvent !== 'undefined' &&
+      typeof DeviceMotionEvent.requestPermission === 'function') {
+    try {
+      const perm = await DeviceMotionEvent.requestPermission();
+      if (perm === 'granted') {
+        window.addEventListener('devicemotion', handleMotion);
+        motionGranted = true;
+        permOverlay.classList.remove('visible');
+      }
+    } catch(e) { console.warn('Motion denied', e); }
+  } else {
+    window.addEventListener('devicemotion', handleMotion);
+    motionGranted = true;
+    permOverlay.classList.remove('visible');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// 10. BOUCLE PRINCIPALE
+// ═══════════════════════════════════════════════════════════
+
+function loop() {
+  updatePhysics();
+  drawWave();
+  requestAnimationFrame(loop);
+}
+
+// ═══════════════════════════════════════════════════════════
+// 11. UI
+// ═══════════════════════════════════════════════════════════
+
+function updateTagline() {
+  const sr = speedRatio();
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  if (mode === 'bubbles') {
+    taglineEl.textContent = sr > 0.65
+      ? 'tu vas vite · respire'
+      : 'respire · éclate · relâche';
+  } else {
+    taglineEl.textContent = isDark
+      ? 'mode nuit · doux 🌙'
+      : 'incline · les bulles suivent la gravité';
+  }
+}
+
+function updateSettings() {
+  const sr = speedRatio();
+  document.getElementById('sPopped').textContent = beh.totalPopped;
+  document.getElementById('sMode').textContent =
+    beh.preferredMode === 'bubbles' ? 'Bulles 💧' : 'Gravité 🌊';
+  document.getElementById('sRhythm').textContent =
+    sr > 0.65 ? 'Rapide ⚡' : sr > 0.30 ? 'Équilibré 🌊' : 'Zen 🍃';
+}
+
+function setDIColor(m) {
+  const c = m === 'bubbles' ? '#4dd9c0' : '#a78bfa';
+  diArc.style.borderTopColor   = c;
+  diArc.style.borderRightColor = c;
+}
+
+// ═══════════════════════════════════════════════════════════
+// 12. SWITCH DE MODE
+// ═══════════════════════════════════════════════════════════
+
+function switchMode() {
+  clearBubbles();
+  mode = mode === 'bubbles' ? 'gravity' : 'bubbles';
+  recordMode(mode);
+
+  if (mode === 'bubbles') {
+    bubblesArea.classList.add('active');
+    gravityArea.classList.remove('active');
+    switchBtn.textContent = '🌊 Gravité';
+    ax = 0; ay = 0;
+    permOverlay.classList.remove('visible');
+  } else {
+    bubblesArea.classList.remove('active');
+    gravityArea.classList.add('active');
+    switchBtn.textContent = '💧 Bulles';
+    gx = 0; gy = 1;
+    if (!motionGranted) permOverlay.classList.add('visible');
+    else requestMotion();
+  }
+
+  setDIColor(mode);
+  updateTagline();
+  spawnBubbles();
+}
+
+// ═══════════════════════════════════════════════════════════
+// 13. ÉVÉNEMENTS
+// ═══════════════════════════════════════════════════════════
+
+switchBtn.addEventListener('click', switchMode);
+
+document.getElementById('gearBtn').addEventListener('click', () => {
+  updateSettings();
+  settingsPanel.classList.add('open');
+});
+document.getElementById('closeBtn').addEventListener('click', () => {
+  settingsPanel.classList.remove('open');
+});
+document.getElementById('resetBtn').addEventListener('click', () => {
+  beh = defaultBeh(); saveBeh();
+  count = 0; countNumEl.textContent = 0;
+  counterEl.classList.remove('visible');
+  updateSettings(); updateTagline();
+});
+document.getElementById('grantBtn').addEventListener('click', requestMotion);
+
+// ═══════════════════════════════════════════════════════════
+// 14. ICÔNE DYNAMIQUE (apple-touch-icon)
+// ═══════════════════════════════════════════════════════════
+
+function generateIcon() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 512;
+  const ctx = c.getContext('2d');
+
+  // Fond
+  ctx.fillStyle = '#010207';
+  ctx.fillRect(0, 0, 512, 512);
+
+  // Bulle
+  const grd = ctx.createRadialGradient(210, 200, 0, 256, 256, 175);
+  grd.addColorStop(0,   'rgba(255,255,255,0.48)');
+  grd.addColorStop(0.3, 'rgba(255,255,255,0.1)');
+  grd.addColorStop(0.7, 'rgba(77,217,192,0.1)');
+  grd.addColorStop(1,   'rgba(77,217,192,0.2)');
+  ctx.beginPath();
+  ctx.arc(256, 256, 175, 0, Math.PI * 2);
+  ctx.fillStyle = grd;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.32)';
+  ctx.lineWidth = 7;
+  ctx.stroke();
+
+  // Reflet
+  ctx.save();
+  ctx.globalAlpha = 0.55;
+  ctx.filter = 'blur(8px)';
+  ctx.beginPath();
+  ctx.ellipse(200, 192, 66, 40, -0.35, 0, Math.PI * 2);
+  ctx.fillStyle = 'white';
+  ctx.fill();
+  ctx.restore();
+
+  return c.toDataURL('image/png');
+}
+
+try {
+  const iconUrl = generateIcon();
+  let link = document.querySelector("link[rel='apple-touch-icon']");
+  if (!link) {
+    link = document.createElement('link');
+    link.rel = 'apple-touch-icon';
+    document.head.appendChild(link);
+  }
+  link.href = iconUrl;
+} catch(e) {}
+
+// ═══════════════════════════════════════════════════════════
+// 15. MESSAGE DE SESSION
+// ═══════════════════════════════════════════════════════════
+
+setTimeout(() => {
+  if ((Date.now() - sessionStart) / 60000 < 3) return;
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  sessionMsgEl.textContent = isDark
+    ? 'prends soin de toi ce soir 🌙'
+    : 'tu te détends bien 🌊';
+  sessionMsgEl.classList.add('visible');
+  setTimeout(() => sessionMsgEl.classList.remove('visible'), 4500);
+}, 180000);
+
+// ═══════════════════════════════════════════════════════════
+// 16. SERVICE WORKER
+// ═══════════════════════════════════════════════════════════
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+
+// ═══════════════════════════════════════════════════════════
+// 17. INIT
+// ═══════════════════════════════════════════════════════════
+
+computeBounds();
+
+// Mode initial
+if (mode === 'gravity') {
+  bubblesArea.classList.remove('active');
+  gravityArea.classList.add('active');
+  switchBtn.textContent = '💧 Bulles';
+}
+
+setDIColor(mode);
+updateTagline();
+requestMotion();
+spawnBubbles();
+requestAnimationFrame(loop);
+
+</script>
 </body>
 </html>
